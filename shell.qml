@@ -125,7 +125,7 @@ ShellRoot {
 
                     anchors {
                         left: timeText.right
-                        leftMargin: 4
+                        leftMargin: 1
                         verticalCenter: parent.verticalCenter
                     }
 
