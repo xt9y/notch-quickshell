@@ -12,7 +12,7 @@ ShellRoot {
         }
 
         color: "transparent"
-        implicitHeight: 32
+        implicitHeight: 31
         exclusionMode: ExclusionMode.Ignore
 
         // Only the physical notch / expanded island catches the pointer.
@@ -29,10 +29,11 @@ ShellRoot {
             id: island
 
             // Tuned for a Retina-scaled notched MacBook display.
+            // 31 logical px is roughly 62 physical px at 2x scale.
             // Hover changes width only: the island never grows downward.
             property int notchWidth: 98
-            property int notchHeight: 32
-            property int expandedWidth: 330
+            property int notchHeight: 31
+            property int expandedWidth: 350
             property int cornerRadius: 8
             property bool expanded: hover.hovered
             property real wingWidth: (width - notchWidth) / 2
