@@ -69,11 +69,11 @@ ShellRoot {
                     width: (parent.width - parent.spacing) / 2
                     anchors.verticalCenter: parent.verticalCenter
 
-                    // Left: date
-                    text: Qt.formatDateTime(clock.date, "ddd, d MMM")
-                    color: "#b8b8bd"
-                    font.pixelSize: 15
-                    font.weight: Font.Medium
+                    // Left: time
+                    text: Qt.formatDateTime(clock.date, "HH:mm")
+                    color: "white"
+                    font.pixelSize: 24
+                    font.weight: Font.DemiBold
                     horizontalAlignment: Text.AlignLeft
                 }
 
@@ -81,11 +81,11 @@ ShellRoot {
                     width: (parent.width - parent.spacing) / 2
                     anchors.verticalCenter: parent.verticalCenter
 
-                    // Right: time
-                    text: Qt.formatDateTime(clock.date, "HH:mm")
-                    color: "white"
-                    font.pixelSize: 24
-                    font.weight: Font.DemiBold
+                    // Right: date
+                    text: Qt.formatDateTime(clock.date, "ddd, d MMM")
+                    color: "#b8b8bd"
+                    font.pixelSize: 15
+                    font.weight: Font.Medium
                     horizontalAlignment: Text.AlignRight
                 }
             }
