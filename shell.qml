@@ -25,14 +25,14 @@ ShellRoot {
             precision: SystemClock.Minutes
         }
 
-        Rectangle {
+        Item {
             id: island
 
             // Tuned for a Retina-scaled notched MacBook display.
             // Hover changes width only: the island never grows downward.
             property int notchWidth: 98
             property int notchHeight: 32
-            property int expandedWidth: 248
+            property int expandedWidth: 292
             property int cornerRadius: 8
             property bool expanded: hover.hovered
 
@@ -41,19 +41,36 @@ ShellRoot {
 
             width: expanded ? expandedWidth : notchWidth
             height: notchHeight
-            radius: cornerRadius
-            color: "black"
-            clip: true
 
             HoverHandler {
                 id: hover
             }
 
+            // Rounded body for the bottom corners.
+            Rectangle {
+                anchors.fill: parent
+                radius: island.cornerRadius
+                color: "black"
+            }
+
+            // Fill the top corner cutouts so the edge touching the display
+            // bezel is completely straight. Only the bottom corners remain rounded.
+            Rectangle {
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                }
+
+                height: island.cornerRadius
+                color: "black"
+            }
+
             Row {
                 anchors {
                     fill: parent
-                    leftMargin: 14
-                    rightMargin: 14
+                    leftMargin: 18
+                    rightMargin: 18
                 }
 
                 spacing: 16
