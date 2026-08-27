@@ -32,9 +32,10 @@ ShellRoot {
             // Hover changes width only: the island never grows downward.
             property int notchWidth: 98
             property int notchHeight: 32
-            property int expandedWidth: 292
+            property int expandedWidth: 330
             property int cornerRadius: 8
             property bool expanded: hover.hovered
+            property real wingWidth: (width - notchWidth) / 2
 
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
@@ -66,14 +67,21 @@ ShellRoot {
                 color: "black"
             }
 
-            Row {
+            // The physical notch owns the middle notchWidth pixels. The text is
+            // deliberately kept in the two side wings so it can never hide behind it.
+            Text {
                 anchors {
-                    fill: parent
-                    leftMargin: 18
-                    rightMargin: 18
+                    left: parent.left
+                    verticalCenter: parent.verticalCenter
                 }
 
-                spacing: 16
+                width: island.wingWidth
+                text: Qt.formatDateTime(clock.date, "HH:mm")
+                color: "white"
+                font.pixelSize: 17
+                font.weight: Font.DemiBold
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
                 opacity: island.expanded ? 1 : 0
 
                 Behavior on opacity {
@@ -82,29 +90,28 @@ ShellRoot {
                         easing.type: Easing.OutCubic
                     }
                 }
+            }
 
-                Text {
-                    width: (parent.width - parent.spacing) / 2
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    text: Qt.formatDateTime(clock.date, "HH:mm")
-                    color: "white"
-                    font.pixelSize: 17
-                    font.weight: Font.DemiBold
-                    horizontalAlignment: Text.AlignLeft
-                    verticalAlignment: Text.AlignVCenter
+            Text {
+                anchors {
+                    right: parent.right
+                    verticalCenter: parent.verticalCenter
                 }
 
-                Text {
-                    width: (parent.width - parent.spacing) / 2
-                    anchors.verticalCenter: parent.verticalCenter
+                width: island.wingWidth
+                text: Qt.formatDateTime(clock.date, "ddd, d MMM")
+                color: "#b8b8bd"
+                font.pixelSize: 13
+                font.weight: Font.Medium
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                opacity: island.expanded ? 1 : 0
 
-                    text: Qt.formatDateTime(clock.date, "ddd, d MMM")
-                    color: "#b8b8bd"
-                    font.pixelSize: 13
-                    font.weight: Font.Medium
-                    horizontalAlignment: Text.AlignRight
-                    verticalAlignment: Text.AlignVCenter
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: 100
+                        easing.type: Easing.OutCubic
+                    }
                 }
             }
 
