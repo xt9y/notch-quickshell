@@ -82,37 +82,12 @@ ShellRoot {
                 color: "black"
             }
 
-            // Left wing: time is deliberately bound to the outer left edge.
-            Text {
+            // Left wing: time on the far left, battery immediately to its right.
+            Item {
+                id: leftWing
+
                 anchors {
                     left: parent.left
-                    leftMargin: 16
-                    verticalCenter: parent.verticalCenter
-                }
-
-                width: Math.max(0, island.wingWidth - 16)
-                text: Qt.formatDateTime(clock.date, "HH:mm")
-                color: "white"
-                font.pixelSize: 17
-                font.weight: Font.DemiBold
-                horizontalAlignment: Text.AlignLeft
-                verticalAlignment: Text.AlignVCenter
-                opacity: island.expanded ? 1 : 0
-
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: 100
-                        easing.type: Easing.OutCubic
-                    }
-                }
-            }
-
-            // Right wing: date plus a compact battery indicator.
-            Item {
-                id: rightWing
-
-                anchors {
-                    right: parent.right
                     verticalCenter: parent.verticalCenter
                 }
 
@@ -127,12 +102,30 @@ ShellRoot {
                     }
                 }
 
+                Text {
+                    id: timeText
+
+                    anchors {
+                        left: parent.left
+                        leftMargin: 16
+                        verticalCenter: parent.verticalCenter
+                    }
+
+                    width: 54
+                    text: Qt.formatDateTime(clock.date, "HH:mm")
+                    color: "white"
+                    font.pixelSize: 17
+                    font.weight: Font.DemiBold
+                    horizontalAlignment: Text.AlignLeft
+                    verticalAlignment: Text.AlignVCenter
+                }
+
                 Item {
                     id: batteryIndicator
 
                     anchors {
-                        right: parent.right
-                        rightMargin: 10
+                        left: timeText.right
+                        leftMargin: 5
                         verticalCenter: parent.verticalCenter
                     }
 
@@ -205,22 +198,29 @@ ShellRoot {
                         verticalAlignment: Text.AlignVCenter
                     }
                 }
+            }
 
-                Text {
-                    anchors {
-                        left: parent.left
-                        leftMargin: 6
-                        right: batteryIndicator.left
-                        rightMargin: 6
-                        verticalCenter: parent.verticalCenter
+            // Right wing: date only, kept entirely clear of the physical notch.
+            Text {
+                anchors {
+                    right: parent.right
+                    verticalCenter: parent.verticalCenter
+                }
+
+                width: island.wingWidth
+                text: Qt.formatDateTime(clock.date, "ddd, d MMM")
+                color: "#b8b8bd"
+                font.pixelSize: 12
+                font.weight: Font.Medium
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                opacity: island.expanded ? 1 : 0
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: 100
+                        easing.type: Easing.OutCubic
                     }
-
-                    text: Qt.formatDateTime(clock.date, "ddd, d MMM")
-                    color: "#b8b8bd"
-                    font.pixelSize: 12
-                    font.weight: Font.Medium
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
                 }
             }
 
