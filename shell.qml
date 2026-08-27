@@ -114,8 +114,8 @@ ShellRoot {
                     width: 54
                     text: Qt.formatDateTime(clock.date, "HH:mm")
                     color: "white"
-                    font.pixelSize: 17
-                    font.weight: Font.DemiBold
+                    font.pixelSize: 12
+                    font.weight: Font.Medium
                     horizontalAlignment: Text.AlignLeft
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -192,7 +192,7 @@ ShellRoot {
 
                         text: Math.round(island.batteryLevel * 100)
                         color: island.batteryColor
-                        font.pixelSize: 9
+                        font.pixelSize: 12
                         font.weight: Font.Medium
                         horizontalAlignment: Text.AlignRight
                         verticalAlignment: Text.AlignVCenter
