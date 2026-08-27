@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Services.UPower
 
 ShellRoot {
     PanelWindow {
@@ -12,7 +13,7 @@ ShellRoot {
         }
 
         color: "transparent"
-        implicitHeight: 31
+        implicitHeight: 29
         exclusionMode: ExclusionMode.Ignore
 
         // Only the physical notch / expanded island catches the pointer.
@@ -28,15 +29,29 @@ ShellRoot {
         Item {
             id: island
 
-            // Tuned for a Retina-scaled notched MacBook display.
-            // 31 logical px is roughly 62 physical px at 2x scale.
-            // Hover changes width only: the island never grows downward.
             property int notchWidth: 98
-            property int notchHeight: 31
-            property int expandedWidth: 350
+            property int notchHeight: 29
+            property int expandedWidth: 370
             property int cornerRadius: 8
             property bool expanded: hover.hovered
             property real wingWidth: (width - notchWidth) / 2
+
+            property var battery: UPower.displayDevice
+            property real batteryLevel: battery && battery.ready
+                ? Math.max(0, Math.min(1, battery.percentage))
+                : 0
+            property bool batteryCharging: battery && battery.ready &&
+                (battery.state === UPowerDeviceState.Charging ||
+                 battery.state === UPowerDeviceState.PendingCharge)
+            property bool batteryFull: battery && battery.ready &&
+                (battery.state === UPowerDeviceState.FullyCharged || batteryLevel >= 0.95)
+            property color batteryColor: batteryCharging || batteryFull
+                ? "#30d158"
+                : batteryLevel <= 0.15
+                    ? "#ff453a"
+                    : batteryLevel <= 0.30
+                        ? "#ffd60a"
+                        : "#f2f2f7"
 
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
@@ -55,8 +70,7 @@ ShellRoot {
                 color: "black"
             }
 
-            // Fill the top corner cutouts so the edge touching the display
-            // bezel is completely straight. Only the bottom corners remain rounded.
+            // Keep the top edge completely square against the display bezel.
             Rectangle {
                 anchors {
                     top: parent.top
@@ -68,20 +82,20 @@ ShellRoot {
                 color: "black"
             }
 
-            // The physical notch owns the middle notchWidth pixels. The text is
-            // deliberately kept in the two side wings so it can never hide behind it.
+            // Left wing: time is deliberately bound to the outer left edge.
             Text {
                 anchors {
                     left: parent.left
+                    leftMargin: 16
                     verticalCenter: parent.verticalCenter
                 }
 
-                width: island.wingWidth
+                width: Math.max(0, island.wingWidth - 16)
                 text: Qt.formatDateTime(clock.date, "HH:mm")
                 color: "white"
                 font.pixelSize: 17
                 font.weight: Font.DemiBold
-                horizontalAlignment: Text.AlignHCenter
+                horizontalAlignment: Text.AlignLeft
                 verticalAlignment: Text.AlignVCenter
                 opacity: island.expanded ? 1 : 0
 
@@ -93,19 +107,17 @@ ShellRoot {
                 }
             }
 
-            Text {
+            // Right wing: date plus a compact battery indicator.
+            Item {
+                id: rightWing
+
                 anchors {
                     right: parent.right
                     verticalCenter: parent.verticalCenter
                 }
 
                 width: island.wingWidth
-                text: Qt.formatDateTime(clock.date, "ddd, d MMM")
-                color: "#b8b8bd"
-                font.pixelSize: 13
-                font.weight: Font.Medium
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
+                height: parent.height
                 opacity: island.expanded ? 1 : 0
 
                 Behavior on opacity {
@@ -113,6 +125,102 @@ ShellRoot {
                         duration: 100
                         easing.type: Easing.OutCubic
                     }
+                }
+
+                Item {
+                    id: batteryIndicator
+
+                    anchors {
+                        right: parent.right
+                        rightMargin: 10
+                        verticalCenter: parent.verticalCenter
+                    }
+
+                    width: 48
+                    height: 14
+                    visible: island.battery && island.battery.ready
+
+                    Rectangle {
+                        id: batteryBody
+
+                        anchors {
+                            left: parent.left
+                            verticalCenter: parent.verticalCenter
+                        }
+
+                        width: 25
+                        height: 12
+                        radius: 3
+                        color: "transparent"
+                        border.width: 1
+                        border.color: island.batteryColor
+
+                        Rectangle {
+                            anchors {
+                                left: parent.left
+                                leftMargin: 2
+                                top: parent.top
+                                topMargin: 2
+                                bottom: parent.bottom
+                                bottomMargin: 2
+                            }
+
+                            width: Math.max(0, (batteryBody.width - 4) * island.batteryLevel)
+                            radius: 1.5
+                            color: island.batteryColor
+
+                            Behavior on width {
+                                NumberAnimation {
+                                    duration: 180
+                                    easing.type: Easing.OutCubic
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        anchors {
+                            left: batteryBody.right
+                            leftMargin: 1
+                            verticalCenter: parent.verticalCenter
+                        }
+
+                        width: 2
+                        height: 6
+                        radius: 1
+                        color: island.batteryColor
+                    }
+
+                    Text {
+                        anchors {
+                            right: parent.right
+                            verticalCenter: parent.verticalCenter
+                        }
+
+                        text: Math.round(island.batteryLevel * 100)
+                        color: island.batteryColor
+                        font.pixelSize: 9
+                        font.weight: Font.Medium
+                        horizontalAlignment: Text.AlignRight
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+
+                Text {
+                    anchors {
+                        left: parent.left
+                        leftMargin: 6
+                        right: batteryIndicator.left
+                        rightMargin: 6
+                        verticalCenter: parent.verticalCenter
+                    }
+
+                    text: Qt.formatDateTime(clock.date, "ddd, d MMM")
+                    color: "#b8b8bd"
+                    font.pixelSize: 12
+                    font.weight: Font.Medium
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
                 }
             }
 
