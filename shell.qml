@@ -16,7 +16,6 @@ ShellRoot {
         implicitHeight: 29
         exclusionMode: ExclusionMode.Ignore
 
-        // Only the physical notch / expanded island catches the pointer.
         mask: Region {
             item: island
         }
@@ -45,6 +44,7 @@ ShellRoot {
                  battery.state === UPowerDeviceState.PendingCharge)
             property bool batteryFull: battery && battery.ready &&
                 (battery.state === UPowerDeviceState.FullyCharged || batteryLevel >= 0.95)
+
             property color batteryColor: batteryCharging || batteryFull
                 ? "#30d158"
                 : batteryLevel <= 0.15
@@ -63,14 +63,14 @@ ShellRoot {
                 id: hover
             }
 
-            // Rounded body for the bottom corners.
+            // Black surface joined directly to the physical notch.
+            // The top edge stays square; only the lower corners are rounded.
             Rectangle {
                 anchors.fill: parent
                 radius: island.cornerRadius
                 color: "black"
             }
 
-            // Keep the top edge completely square against the display bezel.
             Rectangle {
                 anchors {
                     top: parent.top
@@ -82,7 +82,7 @@ ShellRoot {
                 color: "black"
             }
 
-            // Left wing: time on the far left, battery immediately to its right.
+            // Left wing: time, then a compact battery directly beside it.
             Item {
                 id: leftWing
 
@@ -111,7 +111,9 @@ ShellRoot {
                         verticalCenter: parent.verticalCenter
                     }
 
-                    width: 54
+                    // Use the real text width so the battery sits immediately
+                    // beside the time instead of after an invisible fixed box.
+                    width: implicitWidth
                     text: Qt.formatDateTime(clock.date, "HH:mm")
                     color: "white"
                     font.pixelSize: 12
@@ -125,11 +127,11 @@ ShellRoot {
 
                     anchors {
                         left: timeText.right
-                        leftMargin: 1
+                        leftMargin: 7
                         verticalCenter: parent.verticalCenter
                     }
 
-                    width: 44
+                    width: island.batteryCharging ? 34 : 25
                     height: 12
                     visible: island.battery && island.battery.ready
 
@@ -146,7 +148,7 @@ ShellRoot {
                         radius: 2.5
                         color: "transparent"
                         border.width: 1
-                        border.color: island.batteryColor
+                        border.color: "#d1d1d6"
 
                         Rectangle {
                             anchors {
@@ -172,6 +174,8 @@ ShellRoot {
                     }
 
                     Rectangle {
+                        id: batteryTip
+
                         anchors {
                             left: batteryBody.right
                             leftMargin: 1
@@ -181,26 +185,27 @@ ShellRoot {
                         width: 2
                         height: 5
                         radius: 1
-                        color: island.batteryColor
+                        color: "#d1d1d6"
                     }
 
                     Text {
                         anchors {
-                            right: parent.right
+                            left: batteryTip.right
+                            leftMargin: 3
                             verticalCenter: parent.verticalCenter
                         }
 
-                        text: Math.round(island.batteryLevel * 100)
-                        color: island.batteryColor
-                        font.pixelSize: 12
+                        visible: island.batteryCharging
+                        text: "⚡"
+                        color: "white"
+                        font.pixelSize: 11
                         font.weight: Font.Medium
-                        horizontalAlignment: Text.AlignRight
                         verticalAlignment: Text.AlignVCenter
                     }
                 }
             }
 
-            // Right wing: date only, kept entirely clear of the physical notch.
+            // Right wing: date only, entirely outside the physical notch.
             Text {
                 anchors {
                     right: parent.right
