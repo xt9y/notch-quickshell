@@ -63,12 +63,12 @@ ShellRoot {
                 id: hover
             }
 
-            // Black surface joined directly to the physical notch.
+            // Pitch-black surface joined directly to the physical notch.
             // The top edge stays square; only the lower corners are rounded.
             Rectangle {
                 anchors.fill: parent
                 radius: island.cornerRadius
-                color: "black"
+                color: "#000000"
             }
 
             Rectangle {
@@ -79,7 +79,7 @@ ShellRoot {
                 }
 
                 height: island.cornerRadius
-                color: "black"
+                color: "#000000"
             }
 
             // Left wing: time, then a compact battery directly beside it.
@@ -111,8 +111,6 @@ ShellRoot {
                         verticalCenter: parent.verticalCenter
                     }
 
-                    // Use the real text width so the battery sits immediately
-                    // beside the time instead of after an invisible fixed box.
                     width: implicitWidth
                     text: Qt.formatDateTime(clock.date, "HH:mm")
                     color: "white"
@@ -205,19 +203,20 @@ ShellRoot {
                 }
             }
 
-            // Right wing: date only, entirely outside the physical notch.
+            // Right wing: date mirrors the time's 16px outer-edge spacing.
             Text {
                 anchors {
                     right: parent.right
+                    rightMargin: 16
                     verticalCenter: parent.verticalCenter
                 }
 
-                width: island.wingWidth
+                width: implicitWidth
                 text: Qt.formatDateTime(clock.date, "ddd, d MMM")
                 color: "#b8b8bd"
                 font.pixelSize: 12
                 font.weight: Font.Medium
-                horizontalAlignment: Text.AlignHCenter
+                horizontalAlignment: Text.AlignRight
                 verticalAlignment: Text.AlignVCenter
                 opacity: island.expanded ? 1 : 0
 
