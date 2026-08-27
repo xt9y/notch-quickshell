@@ -31,7 +31,7 @@ ShellRoot {
 
             property int notchWidth: 98
             property int notchHeight: 29
-            property int expandedWidth: 370
+            property int expandedWidth: 355
             property int cornerRadius: 8
             property bool expanded: hover.hovered
             property real wingWidth: (width - notchWidth) / 2
@@ -125,12 +125,12 @@ ShellRoot {
 
                     anchors {
                         left: timeText.right
-                        leftMargin: 5
+                        leftMargin: 4
                         verticalCenter: parent.verticalCenter
                     }
 
-                    width: 48
-                    height: 14
+                    width: 44
+                    height: 12
                     visible: island.battery && island.battery.ready
 
                     Rectangle {
@@ -141,9 +141,9 @@ ShellRoot {
                             verticalCenter: parent.verticalCenter
                         }
 
-                        width: 25
-                        height: 12
-                        radius: 3
+                        width: 21
+                        height: 10
+                        radius: 2.5
                         color: "transparent"
                         border.width: 1
                         border.color: island.batteryColor
@@ -159,7 +159,7 @@ ShellRoot {
                             }
 
                             width: Math.max(0, (batteryBody.width - 4) * island.batteryLevel)
-                            radius: 1.5
+                            radius: 1.2
                             color: island.batteryColor
 
                             Behavior on width {
@@ -179,7 +179,7 @@ ShellRoot {
                         }
 
                         width: 2
-                        height: 6
+                        height: 5
                         radius: 1
                         color: island.batteryColor
                     }
