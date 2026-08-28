@@ -10,6 +10,9 @@ Item {
     property real rightWingWidth: wingWidth
     property int normalHeight: 48
     property date now: new Date()
+    // The shell's NormalSettingsOverlay is the single renderer for Date + Time.
+    // Keeping this disabled prevents duplicate text/battery outlines underneath it.
+    property bool renderNormalContent: false
 
     property var battery: null
     property real batteryLevel: 0
@@ -77,7 +80,7 @@ Item {
     }
 
     Item {
-        property bool active: root.displayMode === "normal" && root.expanded
+        property bool active: root.renderNormalContent && root.displayMode === "normal" && root.expanded
         anchors.fill: parent
         opacity: active ? 1 : 0
         scale: active ? 1 : 0.985
