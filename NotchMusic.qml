@@ -58,9 +58,10 @@ Item {
     }
 
     Text {
-        anchors.horizontalCenter: albumArt.horizontalCenter
+        anchors.left: parent.left
+        anchors.leftMargin: 24
         anchors.top: parent.top
-        anchors.topMargin: 16
+        anchors.topMargin: 17
         text: root.volumeValue
         color: "#b8b8bd"
         font.pixelSize: 14
