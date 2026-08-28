@@ -6,7 +6,6 @@ Item {
     id: root
 
     property bool active: false
-    signal backRequested()
     signal statusRefreshRequested()
 
     opacity: active ? 1 : 0
@@ -168,35 +167,14 @@ Item {
         height: 48
 
         Text {
-            id: backGlyph
             anchors.left: parent.left
-            anchors.leftMargin: 22
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.verticalCenterOffset: 2
-            text: symbols.back
-            color: "#d1d1d6"
-            font.pixelSize: 22
-            font.weight: Font.Medium
-        }
-
-        Text {
-            anchors.left: backGlyph.right
-            anchors.leftMargin: 10
+            anchors.leftMargin: 24
             anchors.verticalCenter: parent.verticalCenter
             anchors.verticalCenterOffset: 2
             text: "Sound"
             color: "#f5f5f7"
             font.pixelSize: 16
             font.weight: Font.DemiBold
-        }
-
-        MouseArea {
-            anchors.left: parent.left
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            width: 120
-            cursorShape: Qt.PointingHandCursor
-            onClicked: root.backRequested()
         }
 
         Text {
