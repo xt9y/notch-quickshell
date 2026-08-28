@@ -116,11 +116,14 @@ ShellRoot {
             property bool wifiAvailable: false
             property bool wifiEnabled: false
             property string wifiSsid: ""
+            property string lastWifiSsid: ""
+            property bool wifiInitialized: false
             property bool bluetoothAvailable: false
             property bool bluetoothPowered: false
             property string bluetoothDevice: ""
             property string lastBluetoothDevice: ""
             property bool bluetoothInitialized: false
+            property string connectionEventLabel: "Bluetooth"
             property string bluetoothEventText: "Bluetooth"
 
             TextMetrics {
@@ -224,6 +227,12 @@ ShellRoot {
                 transientMode = mode
                 transientTimer.interval = duration || 1850
                 transientTimer.restart()
+            }
+
+            function showConnectionEvent(label, text, duration) {
+                connectionEventLabel = label
+                bluetoothEventText = text
+                showTransient("bluetooth", duration || 2200)
             }
 
             function resetToNormal() {
@@ -380,48 +389,73 @@ ShellRoot {
 
             function consumeWifi(raw) {
                 var lines = raw.trim().split("\n")
-                if (lines.length === 0 || lines[0] === "") {
+                var valid = lines.length > 0 && lines[0] !== ""
+                var nextSsid = ""
+
+                if (!valid) {
                     wifiAvailable = false
                     wifiEnabled = false
-                    wifiSsid = ""
+                } else {
+                    wifiAvailable = true
+                    wifiEnabled = lines[0] === "enabled"
+                    nextSsid = lines.length > 1 ? lines[1].trim() : ""
+                }
+
+                wifiSsid = nextSsid
+
+                if (!wifiInitialized) {
+                    wifiInitialized = true
+                    lastWifiSsid = nextSsid
+                    if (nextSsid !== "")
+                        showConnectionEvent("Wi-Fi", nextSsid, 2200)
                     return
                 }
 
-                wifiAvailable = true
-                wifiEnabled = lines[0] === "enabled"
-                wifiSsid = lines.length > 1 ? lines[1].trim() : ""
+                if (nextSsid !== lastWifiSsid) {
+                    if (nextSsid !== "")
+                        showConnectionEvent("Wi-Fi", nextSsid, 2200)
+                    else if (lastWifiSsid !== "")
+                        showConnectionEvent("Wi-Fi", lastWifiSsid + " disconnected", 2200)
+                    lastWifiSsid = nextSsid
+                }
             }
 
             function consumeBluetooth(raw) {
                 var lines = raw.trim().split("\n")
-                if (lines.length === 0 || lines[0] === "") {
+                var valid = lines.length > 0 && lines[0] !== ""
+                var nextDevice = ""
+
+                if (!valid) {
                     bluetoothAvailable = false
                     bluetoothPowered = false
-                    bluetoothDevice = ""
-                    return
+                } else {
+                    bluetoothAvailable = true
+                    bluetoothPowered = lines[0] === "yes"
+                    nextDevice = lines.length > 1
+                        ? lines.slice(1).join(" ").trim()
+                        : ""
                 }
 
-                bluetoothAvailable = true
-                bluetoothPowered = lines[0] === "yes"
-                bluetoothDevice = lines.length > 1
-                    ? lines.slice(1).join(" ").trim()
-                    : ""
+                bluetoothDevice = nextDevice
 
                 if (!bluetoothInitialized) {
                     bluetoothInitialized = true
-                    lastBluetoothDevice = bluetoothDevice
+                    lastBluetoothDevice = nextDevice
+                    if (nextDevice !== "")
+                        showConnectionEvent("Bluetooth", nextDevice, 2200)
                     return
                 }
 
-                if (bluetoothDevice !== lastBluetoothDevice) {
-                    if (bluetoothDevice !== "") {
-                        bluetoothEventText = bluetoothDevice
-                        showTransient("bluetooth", 2200)
-                    } else if (lastBluetoothDevice !== "") {
-                        bluetoothEventText = lastBluetoothDevice + " disconnected"
-                        showTransient("bluetooth", 2200)
-                    }
-                    lastBluetoothDevice = bluetoothDevice
+                if (nextDevice !== lastBluetoothDevice) {
+                    if (nextDevice !== "")
+                        showConnectionEvent("Bluetooth", nextDevice, 2200)
+                    else if (lastBluetoothDevice !== "")
+                        showConnectionEvent(
+                            "Bluetooth",
+                            lastBluetoothDevice + " disconnected",
+                            2200
+                        )
+                    lastBluetoothDevice = nextDevice
                 }
             }
 
@@ -759,6 +793,7 @@ ShellRoot {
                     wifiSsid: island.wifiSsid
                     bluetoothPowered: island.bluetoothPowered
                     bluetoothDevice: island.bluetoothDevice
+                    connectionEventLabel: island.connectionEventLabel
                     bluetoothEventText: island.bluetoothEventText
                     detailPanelType: island.selectedMode === "bluetoothPanel"
                         ? "bluetooth"
