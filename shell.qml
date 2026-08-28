@@ -13,13 +13,13 @@ ShellRoot {
         }
 
         color: "transparent"
-        implicitHeight: 29
+        implicitHeight: 36
 
         // Reserve the notch clearance directly through Wayland layer-shell.
         // KWin respects this like a panel strut, so no compositor-specific
         // monitor reservation is needed.
         exclusionMode: ExclusionMode.Normal
-        exclusiveZone: 30
+        exclusiveZone: 37
 
         mask: Region {
             item: island
@@ -33,10 +33,12 @@ ShellRoot {
         Item {
             id: island
 
-            property int notchWidth: 98
-            property int notchHeight: 29
-            property int expandedWidth: 355
-            property int cornerRadius: 8
+            // The complete notch UI is scaled up by roughly 25% while keeping
+            // the same proportions and interaction model.
+            property int notchWidth: 123
+            property int notchHeight: 36
+            property int expandedWidth: 444
+            property int cornerRadius: 10
             property bool expanded: hover.hovered
             property real wingWidth: (width - notchWidth) / 2
 
@@ -116,14 +118,14 @@ ShellRoot {
 
                     anchors {
                         left: parent.left
-                        leftMargin: 16
+                        leftMargin: 20
                         verticalCenter: parent.verticalCenter
                     }
 
                     width: implicitWidth
                     text: Qt.formatDateTime(clock.date, "HH:mm")
                     color: "white"
-                    font.pixelSize: 12
+                    font.pixelSize: 15
                     font.weight: Font.Medium
                     horizontalAlignment: Text.AlignLeft
                     verticalAlignment: Text.AlignVCenter
@@ -134,12 +136,12 @@ ShellRoot {
 
                     anchors {
                         left: timeText.right
-                        leftMargin: 7
+                        leftMargin: 9
                         verticalCenter: parent.verticalCenter
                     }
 
-                    width: island.batteryCharging ? 34 : 25
-                    height: 12
+                    width: island.batteryCharging ? 43 : 31
+                    height: 15
                     visible: island.battery && island.battery.ready
 
                     Rectangle {
@@ -150,9 +152,9 @@ ShellRoot {
                             verticalCenter: parent.verticalCenter
                         }
 
-                        width: 21
-                        height: 10
-                        radius: 2.5
+                        width: 26
+                        height: 13
+                        radius: 3
                         color: "transparent"
                         border.width: 1
                         border.color: "#d1d1d6"
@@ -160,15 +162,15 @@ ShellRoot {
                         Rectangle {
                             anchors {
                                 left: parent.left
-                                leftMargin: 2
+                                leftMargin: 3
                                 top: parent.top
-                                topMargin: 2
+                                topMargin: 3
                                 bottom: parent.bottom
-                                bottomMargin: 2
+                                bottomMargin: 3
                             }
 
-                            width: Math.max(0, (batteryBody.width - 4) * island.batteryLevel)
-                            radius: 1.2
+                            width: Math.max(0, (batteryBody.width - 6) * island.batteryLevel)
+                            radius: 1.5
                             color: island.batteryColor
 
                             Behavior on width {
@@ -189,23 +191,23 @@ ShellRoot {
                             verticalCenter: parent.verticalCenter
                         }
 
-                        width: 2
-                        height: 5
-                        radius: 1
+                        width: 3
+                        height: 6
+                        radius: 1.5
                         color: "#d1d1d6"
                     }
 
                     Text {
                         anchors {
                             left: batteryTip.right
-                            leftMargin: 3
+                            leftMargin: 4
                             verticalCenter: parent.verticalCenter
                         }
 
                         visible: island.batteryCharging
                         text: "⚡"
                         color: "white"
-                        font.pixelSize: 11
+                        font.pixelSize: 14
                         font.weight: Font.Medium
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -215,14 +217,14 @@ ShellRoot {
             Text {
                 anchors {
                     right: parent.right
-                    rightMargin: 16
+                    rightMargin: 20
                     verticalCenter: parent.verticalCenter
                 }
 
                 width: implicitWidth
                 text: Qt.formatDateTime(clock.date, "ddd, d MMM")
                 color: "#b8b8bd"
-                font.pixelSize: 12
+                font.pixelSize: 15
                 font.weight: Font.Medium
                 horizontalAlignment: Text.AlignRight
                 verticalAlignment: Text.AlignVCenter
