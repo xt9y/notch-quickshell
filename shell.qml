@@ -29,6 +29,10 @@ ShellRoot {
             precision: SystemClock.Minutes
         }
 
+        WeatherKeyState {
+            id: weatherKeyState
+        }
+
         Item {
             id: island
 
@@ -38,6 +42,7 @@ ShellRoot {
             property int normalHeight: 48
             property int musicHeight: 132
             property int detailHeight: 360
+            property int weatherSetupHeight: 220
             property int weatherDetailHeight: 480
             property int bluetoothEventHeight: 96
             property int cornerRadius: 13
@@ -177,7 +182,9 @@ ShellRoot {
                 if (mode === "music")
                     return musicHeight
                 if (mode === "weatherPanel")
-                    return weatherDetailHeight
+                    return weatherKeyState.configured
+                        ? weatherDetailHeight
+                        : weatherSetupHeight
                 if (mode === "calendarPanel" || mode === "wifiPanel" || mode === "bluetoothPanel" || mode === "soundPanel")
                     return detailHeight
                 if (mode === "bluetooth")
