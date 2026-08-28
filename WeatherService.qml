@@ -6,7 +6,9 @@ Item {
 
     property bool keyLoaded: false
     property string apiKey: ""
+    property string provider: ""
     property string pendingKey: ""
+    property bool validating: false
     property bool loading: false
     property bool ready: false
     property string errorText: ""
@@ -37,6 +39,13 @@ Item {
     property var alerts: []
     property var airQuality: ({})
 
+    property string helperPath: {
+        var uri = Qt.resolvedUrl("weather_backend.py").toString()
+        if (uri.indexOf("file://") === 0)
+            return decodeURIComponent(uri.substring(7))
+        return uri
+    }
+
     width: 0
     height: 0
     visible: false
@@ -46,14 +55,27 @@ Item {
         return isFinite(n) ? n : (fallback === undefined ? 0 : fallback)
     }
 
+    function providerName() {
+        return provider === "openweather" ? "OpenWeather" : "WeatherAPI.com"
+    }
+
+    function runDetection(key) {
+        if (key === "" || detectKey.running)
+            return
+        validating = true
+        errorText = "Checking API key"
+        detectKey.environment = ({ WEATHER_API_KEY: key })
+        detectKey.running = true
+    }
+
     function saveApiKey(value) {
         var key = (value || "").trim()
-        if (key === "" || saveKey.running)
+        if (key === "" || detectKey.running || saveKey.running)
             return
 
         pendingKey = key
-        saveKey.environment = ({ WEATHER_API_KEY: key })
-        saveKey.running = true
+        ready = false
+        runDetection(key)
     }
 
     function clearApiKey() {
@@ -63,13 +85,42 @@ Item {
     }
 
     function refresh() {
-        if (!keyLoaded || apiKey === "" || weatherFetch.running)
+        if (!keyLoaded || apiKey === "" || provider === "" || weatherFetch.running)
             return
 
         loading = true
         errorText = ""
         weatherFetch.environment = ({ WEATHER_API_KEY: apiKey })
+        weatherFetch.command = ["python3", helperPath, "fetch", provider]
         weatherFetch.running = true
+    }
+
+    function consumeProvider(raw) {
+        var detected = (raw || "").trim()
+        validating = false
+        detectKey.environment = ({})
+
+        if (detected !== "weatherapi" && detected !== "openweather") {
+            pendingKey = ""
+            apiKey = ""
+            provider = ""
+            ready = false
+            errorText = "Key not accepted by WeatherAPI.com or OpenWeather"
+            return
+        }
+
+        provider = detected
+        apiKey = pendingKey
+        pendingKey = ""
+        keyLoaded = true
+        ready = false
+        errorText = ""
+
+        saveKey.environment = ({
+            WEATHER_API_KEY: apiKey,
+            WEATHER_PROVIDER: provider
+        })
+        saveKey.running = true
     }
 
     function consumeWeather(raw) {
@@ -195,7 +246,7 @@ Item {
     Timer {
         interval: 10 * 60 * 1000
         repeat: true
-        running: root.apiKey !== ""
+        running: root.apiKey !== "" && root.provider !== ""
         onTriggered: root.refresh()
     }
 
@@ -204,17 +255,47 @@ Item {
         command: [
             "bash",
             "-lc",
-            "file=\"${XDG_CONFIG_HOME:-$HOME/.config}/notch-quickshell/weather-api-key\"; " +
-            "[ -r \"$file\" ] && cat \"$file\" || true"
+            "dir=\"${XDG_CONFIG_HOME:-$HOME/.config}/notch-quickshell\"; " +
+            "provider=''; key=''; " +
+            "[ -r \"$dir/weather-provider\" ] && provider=$(cat \"$dir/weather-provider\"); " +
+            "[ -r \"$dir/weather-api-key\" ] && key=$(cat \"$dir/weather-api-key\"); " +
+            "printf '%s\\n%s' \"$provider\" \"$key\""
         ]
         stdout: StdioCollector {
             onStreamFinished: {
-                root.apiKey = text.trim()
+                var lines = text.split("\n")
+                var storedProvider = lines.length > 0 ? lines.shift().trim() : ""
+                var storedKey = lines.join("\n").trim()
+
                 root.keyLoaded = true
-                if (root.apiKey !== "")
+                if (storedKey === "") {
+                    root.apiKey = ""
+                    root.provider = ""
+                    return
+                }
+
+                if (storedProvider === "weatherapi" || storedProvider === "openweather") {
+                    root.apiKey = storedKey
+                    root.provider = storedProvider
                     Qt.callLater(root.refresh)
+                } else {
+                    root.pendingKey = storedKey
+                    root.apiKey = ""
+                    root.provider = ""
+                    Qt.callLater(function() { root.runDetection(storedKey) })
+                }
             }
         }
+    }
+
+    Process {
+        id: detectKey
+        command: ["python3", root.helperPath, "detect"]
+        stdout: StdioCollector {
+            onStreamFinished: root.consumeProvider(text)
+        }
+        onRunningChanged: if (!running)
+            root.validating = false
     }
 
     Process {
@@ -224,17 +305,14 @@ Item {
             "-lc",
             "set -e; umask 077; " +
             "dir=\"${XDG_CONFIG_HOME:-$HOME/.config}/notch-quickshell\"; " +
-            "mkdir -p \"$dir\"; printf '%s' \"$WEATHER_API_KEY\" > \"$dir/weather-api-key\""
+            "mkdir -p \"$dir\"; " +
+            "printf '%s' \"$WEATHER_API_KEY\" > \"$dir/weather-api-key\"; " +
+            "printf '%s' \"$WEATHER_PROVIDER\" > \"$dir/weather-provider\""
         ]
         onRunningChanged: if (!running) {
             environment = ({})
-            if (root.pendingKey !== "") {
-                root.apiKey = root.pendingKey
-                root.pendingKey = ""
-                root.keyLoaded = true
-                root.ready = false
-                Qt.callLater(root.refresh)
-            }
+            root.keyLoaded = true
+            Qt.callLater(root.refresh)
         }
     }
 
@@ -243,11 +321,14 @@ Item {
         command: [
             "bash",
             "-lc",
-            "rm -f \"${XDG_CONFIG_HOME:-$HOME/.config}/notch-quickshell/weather-api-key\""
+            "dir=\"${XDG_CONFIG_HOME:-$HOME/.config}/notch-quickshell\"; " +
+            "rm -f \"$dir/weather-api-key\" \"$dir/weather-provider\""
         ]
         onRunningChanged: if (!running) {
             root.apiKey = ""
+            root.provider = ""
             root.pendingKey = ""
+            root.validating = false
             root.ready = false
             root.errorText = ""
             root.forecastDays = []
@@ -259,17 +340,6 @@ Item {
 
     Process {
         id: weatherFetch
-        command: [
-            "bash",
-            "-lc",
-            "command -v curl >/dev/null 2>&1 || exit 0; " +
-            "curl -fsS --max-time 15 --get 'https://api.weatherapi.com/v1/forecast.json' " +
-            "--data-urlencode \"key=$WEATHER_API_KEY\" " +
-            "--data-urlencode 'q=auto:ip' " +
-            "--data-urlencode 'days=3' " +
-            "--data-urlencode 'aqi=yes' " +
-            "--data-urlencode 'alerts=yes'"
-        ]
         stdout: StdioCollector {
             onStreamFinished: root.consumeWeather(text)
         }
