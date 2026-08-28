@@ -79,6 +79,27 @@ Item {
         HoverHandler { id: rowHover }
     }
 
+    function prettyDeviceName(name) {
+        var value = (name || "").trim()
+        if (value === "")
+            return "Audio device"
+
+        var machineLike = /^(alsa|bluez)[_.-]/i.test(value) ||
+            value.indexOf("_") !== -1
+
+        if (!machineLike)
+            return value
+
+        value = value.replace(/^(alsa|bluez)[_.-](output|input)[_.-]?/i, "")
+        value = value.replace(/[_.]+/g, " ")
+        value = value.replace(/\s+/g, " ").trim()
+        value = value.replace(/\ba2dp\b/ig, "A2DP")
+        value = value.replace(/\bhdmi\b/ig, "HDMI")
+        value = value.replace(/\busb\b/ig, "USB")
+
+        return value !== "" ? value : "Audio device"
+    }
+
     function consumeStatus(raw) {
         var outputs = []
         var inputs = []
@@ -95,7 +116,7 @@ Item {
             var item = {
                 nodeId: p[1],
                 activeNode: p[2] === "1",
-                deviceName: p.slice(3).join("\t").trim()
+                deviceName: prettyDeviceName(p.slice(3).join("\t"))
             }
 
             if (item.nodeId === "" || item.deviceName === "")
@@ -332,7 +353,7 @@ Item {
             "default_source=$(wpctl inspect @DEFAULT_AUDIO_SOURCE@ 2>/dev/null | sed -n '1s/^id \\([0-9][0-9]*\\),.*/\\1/p'); " +
             "if command -v pw-dump >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then " +
             "export DEFAULT_SINK_ID=\"$default_sink\" DEFAULT_SOURCE_ID=\"$default_source\"; " +
-            "pw-dump 2>/dev/null | python3 -c 'import json,os,sys; data=json.load(sys.stdin); ds=os.getenv(\"DEFAULT_SINK_ID\",\"\"); di=os.getenv(\"DEFAULT_SOURCE_ID\",\"\"); [print(chr(9).join([(\"O\" if c==\"Audio/Sink\" else \"I\"),str(o.get(\"id\",\"\")),(\"1\" if str(o.get(\"id\",\"\"))==(ds if c==\"Audio/Sink\" else di) else \"0\"),label])) for o in data for p in [(o.get(\"info\",{}).get(\"props\",{}) or {})] for c in [str(p.get(\"media.class\",\"\"))] for label in [str(p.get(\"node.description\") or p.get(\"node.nick\") or p.get(\"device.description\") or p.get(\"node.name\") or \"Audio device\").replace(chr(9),\" \").replace(chr(10),\" \").strip()] if c in (\"Audio/Sink\",\"Audio/Source\") and label and not (c==\"Audio/Source\" and str(p.get(\"node.name\",\"\")).endswith(\".monitor\"))]' && exit 0; " +
+            "pw-dump 2>/dev/null | python3 -c 'import json,os,sys; data=json.load(sys.stdin); ds=os.getenv(\"DEFAULT_SINK_ID\",\"\"); di=os.getenv(\"DEFAULT_SOURCE_ID\",\"\"); devs={str(o.get(\"id\",\"\")):(o.get(\"info\",{}).get(\"props\",{}) or {}) for o in data if str((o.get(\"info\",{}).get(\"props\",{}) or {}).get(\"media.class\",\"\"))==\"Audio/Device\"}; [print(chr(9).join([(\"O\" if c==\"Audio/Sink\" else \"I\"),str(o.get(\"id\",\"\")),(\"1\" if str(o.get(\"id\",\"\"))==(ds if c==\"Audio/Sink\" else di) else \"0\"),label])) for o in data for p in [(o.get(\"info\",{}).get(\"props\",{}) or {})] for c in [str(p.get(\"media.class\",\"\"))] for d in [devs.get(str(p.get(\"device.id\",\"\")),{})] for label in [str(p.get(\"node.description\") or p.get(\"device.description\") or d.get(\"device.description\") or p.get(\"node.nick\") or d.get(\"device.nick\") or p.get(\"media.name\") or p.get(\"node.name\") or \"Audio device\").replace(chr(9),\" \").replace(chr(10),\" \").strip()] if c in (\"Audio/Sink\",\"Audio/Source\") and label and not (c==\"Audio/Source\" and str(p.get(\"node.name\",\"\")).endswith(\".monitor\"))]' && exit 0; " +
             "fi; " +
             "wpctl status -n 2>/dev/null | awk '" +
             "/Sinks:/ {section=\"O\"; next} " +
