@@ -74,7 +74,7 @@ Item {
 
     component RoundButton: Rectangle {
         id: button
-        property string glyph: "↻"
+        property string glyph: "R"
         signal clicked()
 
         width: 27
@@ -91,8 +91,8 @@ Item {
             anchors.centerIn: parent
             text: button.glyph
             color: "#d1d1d6"
-            font.pixelSize: 14
-            font.weight: Font.Medium
+            font.pixelSize: 12
+            font.weight: Font.DemiBold
         }
 
         MouseArea {
@@ -426,9 +426,10 @@ Item {
             anchors.left: parent.left
             anchors.leftMargin: 22
             anchors.verticalCenter: parent.verticalCenter
-            text: "‹"
+            text: "<"
             color: "#d1d1d6"
-            font.pixelSize: 26
+            font.pixelSize: 20
+            font.weight: Font.DemiBold
         }
 
         Text {
@@ -477,10 +478,10 @@ Item {
             anchors.left: parent.left
             anchors.leftMargin: 22
             anchors.verticalCenter: parent.verticalCenter
-            text: "✈  Airplane"
+            text: "[AIR]"
             color: root.airplaneAvailable ? "#b8b8bd" : "#48484a"
             font.pixelSize: 12
-            font.weight: Font.Medium
+            font.weight: Font.DemiBold
         }
 
         MiniToggle {
@@ -496,7 +497,7 @@ Item {
             anchors.right: parent.right
             anchors.rightMargin: 20
             anchors.verticalCenter: parent.verticalCenter
-            glyph: "↻"
+            glyph: "R"
             onClicked: root.refreshCurrent(true)
         }
 
@@ -554,7 +555,7 @@ Item {
         Text {
             anchors.centerIn: parent
             visible: root.wifiScanEnabled && wifiModel.count === 0 && !wifiListProbe.running
-            text: "No networks found · refresh"
+            text: "No networks found - refresh"
             color: "#636366"
             font.pixelSize: 13
             font.weight: Font.Medium
@@ -745,9 +746,10 @@ Item {
                         anchors.right: parent.right
                         anchors.rightMargin: 9
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "↵"
+                        text: ">"
                         color: "#b8b8bd"
                         font.pixelSize: 15
+                        font.weight: Font.DemiBold
 
                         MouseArea {
                             anchors.fill: parent
@@ -767,10 +769,10 @@ Item {
                     anchors.rightMargin: 14
                     anchors.verticalCenter: parent.verticalCenter
                     visible: model.known && !wifiRow.editing
-                    text: "×"
+                    text: "x"
                     color: forgetWifiMouse.containsMouse ? "#b8b8bd" : "#636366"
-                    font.pixelSize: 17
-                    font.weight: Font.Medium
+                    font.pixelSize: 15
+                    font.weight: Font.DemiBold
 
                     MouseArea {
                         id: forgetWifiMouse
@@ -914,10 +916,10 @@ Item {
                     anchors.rightMargin: 14
                     anchors.verticalCenter: parent.verticalCenter
                     visible: model.paired
-                    text: "×"
+                    text: "x"
                     color: forgetBtMouse.containsMouse ? "#b8b8bd" : "#636366"
-                    font.pixelSize: 17
-                    font.weight: Font.Medium
+                    font.pixelSize: 15
+                    font.weight: Font.DemiBold
 
                     MouseArea {
                         id: forgetBtMouse
