@@ -10,6 +10,15 @@ hl.monitor({
     mode = "preferred",
     position = "auto",
     scale = "auto",
+
+    -- Keep tiled windows comfortably below the physical MacBook notch.
+    -- This is added on top of Hyprland's normal outer window gap.
+    reserved_area = {
+        top = 40,
+        bottom = 0,
+        left = 0,
+        right = 0,
+    },
 })
 
 ---------------------
@@ -49,8 +58,9 @@ hl.config({
         allow_tearing = false,
         layout = "dwindle",
         col = {
-            active_border = { colors = { "rgba(33ccffee)", "rgba(00ff99ee)" }, angle = 45 },
-            inactive_border = "rgba(595959aa)",
+            -- Focused windows: restrained dark gray. Everything else: pitch black.
+            active_border = "rgba(3a3a3aff)",
+            inactive_border = "rgba(000000ff)",
         },
     },
 
@@ -87,6 +97,7 @@ hl.config({
     },
 
     input = {
+        -- German keyboard layout.
         kb_layout = "de",
         kb_variant = "nodeadkeys",
         kb_model = "",
@@ -162,4 +173,14 @@ hl.window_rule({
     name = "suppress-maximize-events",
     match = { class = ".*" },
     suppress_event = "maximize",
+})
+
+-- Kitty is intentionally compact: roughly one third of the monitor in each
+-- dimension, floating and centered instead of consuming a full tiled slot.
+hl.window_rule({
+    name = "compact-kitty",
+    match = { class = "kitty" },
+    float = true,
+    size = { "monitor_w * 0.33", "monitor_h * 0.33" },
+    center = true,
 })
