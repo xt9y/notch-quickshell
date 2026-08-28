@@ -8,12 +8,13 @@ Item {
     property bool alwaysShowDateTime: false
     property bool use24HourTime: true
     property bool showBattery: true
+
+    // Compatibility properties; timezone support is intentionally disabled.
     property string timeZone: ""
     property string timeZoneError: ""
+
     property string timeText: ""
     property string dateText: ""
-
-    property string pendingTimeZone: ""
     property bool saveQueued: false
     property bool clockRefreshQueued: false
 
@@ -37,11 +38,11 @@ Item {
             saveQueued = true
             return
         }
+
         saveProcess.environment = ({
             NOTCH_ALWAYS: alwaysShowDateTime ? "1" : "0",
             NOTCH_24H: use24HourTime ? "1" : "0",
-            NOTCH_BATTERY: showBattery ? "1" : "0",
-            NOTCH_TZ: timeZone
+            NOTCH_BATTERY: showBattery ? "1" : "0"
         })
         saveProcess.running = true
     }
@@ -63,19 +64,8 @@ Item {
     }
 
     function setTimeZone(value) {
-        var zone = (value || "").trim()
+        timeZone = ""
         timeZoneError = ""
-        if (zone === "") {
-            timeZone = ""
-            save()
-            refreshClock()
-            return
-        }
-        if (timeZoneValidation.running)
-            return
-        pendingTimeZone = zone
-        timeZoneValidation.environment = ({ NOTCH_TZ: zone })
-        timeZoneValidation.running = true
     }
 
     function resetDefaults() {
@@ -95,8 +85,8 @@ Item {
             clockRefreshQueued = true
             return
         }
+
         clockProcess.environment = ({
-            NOTCH_TZ: timeZone,
             NOTCH_24H: use24HourTime ? "1" : "0"
         })
         clockProcess.running = true
@@ -128,6 +118,7 @@ Item {
                     var split = line.indexOf("=")
                     if (split < 0)
                         continue
+
                     var key = line.substring(0, split)
                     var value = line.substring(split + 1)
                     if (key === "alwaysShowDateTime")
@@ -136,9 +127,10 @@ Item {
                         root.use24HourTime = root.boolValue(value, true)
                     else if (key === "showBattery")
                         root.showBattery = root.boolValue(value, true)
-                    else if (key === "timeZone")
-                        root.timeZone = value.trim()
                 }
+
+                root.timeZone = ""
+                root.timeZoneError = ""
                 root.loaded = true
                 Qt.callLater(root.refreshClock)
             }
@@ -153,8 +145,8 @@ Item {
             "set -e; umask 077; " +
             "dir=\"${XDG_CONFIG_HOME:-$HOME/.config}/notch-quickshell\"; mkdir -p \"$dir\"; " +
             "tmp=\"$dir/settings.tmp.$$\"; " +
-            "printf 'alwaysShowDateTime=%s\\nuse24HourTime=%s\\nshowBattery=%s\\ntimeZone=%s\\n' " +
-            "\"$NOTCH_ALWAYS\" \"$NOTCH_24H\" \"$NOTCH_BATTERY\" \"$NOTCH_TZ\" > \"$tmp\"; " +
+            "printf 'alwaysShowDateTime=%s\\nuse24HourTime=%s\\nshowBattery=%s\\n' " +
+            "\"$NOTCH_ALWAYS\" \"$NOTCH_24H\" \"$NOTCH_BATTERY\" > \"$tmp\"; " +
             "mv -f \"$tmp\" \"$dir/settings\""
         ]
         onRunningChanged: if (!running) {
@@ -167,41 +159,12 @@ Item {
     }
 
     Process {
-        id: timeZoneValidation
-        command: [
-            "bash",
-            "-lc",
-            "z=\"$NOTCH_TZ\"; " +
-            "case \"$z\" in *..*|/*) printf no; exit 0 ;; esac; " +
-            "[ -f \"/usr/share/zoneinfo/$z\" ] && printf yes || printf no"
-        ]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var ok = text.trim() === "yes"
-                if (ok) {
-                    root.timeZone = root.pendingTimeZone
-                    root.timeZoneError = ""
-                    root.save()
-                    Qt.callLater(root.refreshClock)
-                } else {
-                    root.timeZoneError = "Unknown time zone"
-                }
-                root.pendingTimeZone = ""
-            }
-        }
-        onRunningChanged: if (!running)
-            environment = ({})
-    }
-
-    Process {
         id: clockProcess
         command: [
             "bash",
             "-lc",
             "if [ \"$NOTCH_24H\" = 1 ]; then fmt='%H:%M'; else fmt='%-I:%M %p'; fi; " +
-            "if [ -n \"$NOTCH_TZ\" ]; then " +
-            "TZ=\"$NOTCH_TZ\" date \"+$fmt%t%a, %-d %b\"; " +
-            "else date \"+$fmt%t%a, %-d %b\"; fi"
+            "date \"+$fmt%t%a, %-d %b\""
         ]
         stdout: StdioCollector {
             onStreamFinished: {
