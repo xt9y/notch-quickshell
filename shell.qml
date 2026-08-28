@@ -1,21 +1,8 @@
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import Quickshell.Services.UPower
 
 ShellRoot {
-    // Make this repository the source of truth for Hyprland as well.
-    // Every `qs -c notch` run ensures ~/.config/hypr/hyprland.lua points
-    // at hypr/hyprland.lua in this repo, then reloads Hyprland.
-    Process {
-        running: true
-        command: [
-            "bash",
-            Quickshell.shellDir + "/scripts/apply-hypr.sh",
-            Quickshell.shellDir
-        ]
-    }
-
     PanelWindow {
         id: panel
 
@@ -27,7 +14,12 @@ ShellRoot {
 
         color: "transparent"
         implicitHeight: 29
-        exclusionMode: ExclusionMode.Ignore
+
+        // Reserve the notch clearance directly through Wayland layer-shell.
+        // KWin respects this like a panel strut, so no compositor-specific
+        // monitor reservation is needed.
+        exclusionMode: ExclusionMode.Normal
+        exclusiveZone: 30
 
         mask: Region {
             item: island
@@ -47,6 +39,7 @@ ShellRoot {
             property int cornerRadius: 8
             property bool expanded: hover.hovered
             property real wingWidth: (width - notchWidth) / 2
+
             // In the idle state, rely entirely on the physical M2 notch. Keep
             // the software surface alive while the width animation contracts,
             // then remove it completely once we are fully collapsed.
