@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Notch Quickshell
-Comment=Start the M2 notch Quickshell widget
-Exec=qs -c notch
-Terminal=false
-StartupNotify=false
-OnlyShowIn=KDE;
