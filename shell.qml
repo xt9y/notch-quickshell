@@ -17,15 +17,13 @@ ShellRoot {
 
         color: "transparent"
 
-        // Only the normal notch height is reserved from Plasma. Taller modes
-        // float over the desktop instead of pushing windows downward.
-        implicitHeight: 132
+        // Large Music / Wi-Fi / Bluetooth views overlay the desktop. Plasma
+        // only reserves the normal notch clearance.
+        implicitHeight: 360
         exclusionMode: ExclusionMode.Normal
         exclusiveZone: 49
 
-        mask: Region {
-            item: island
-        }
+        mask: Region { item: island }
 
         SystemClock {
             id: clock
@@ -39,21 +37,19 @@ ShellRoot {
             property int collapsedVisualHeight: 44
             property int normalHeight: 48
             property int musicHeight: 132
+            property int connectivityPanelHeight: 360
             property int cornerRadius: 13
 
             property string selectedMode: "normal"
             property string transientMode: ""
             property string displayMode: transientMode !== "" ? transientMode : selectedMode
-
-            // Keep an expanded notch alive briefly after the pointer leaves.
             property bool hoverHold: false
             property bool expanded: hover.hovered || hoverHold || transientMode !== ""
 
-            // Battery / charger state.
+            // ---------- BATTERY ----------
             property var battery: UPower.displayDevice
             property real batteryLevel: battery && battery.ready
-                ? Math.max(0, Math.min(1, battery.percentage))
-                : 0
+                ? Math.max(0, Math.min(1, battery.percentage)) : 0
             property bool batteryCharging: battery && battery.ready &&
                 (battery.state === UPowerDeviceState.Charging ||
                  battery.state === UPowerDeviceState.PendingCharge)
@@ -63,18 +59,14 @@ ShellRoot {
                 ? "#30d158"
                 : batteryLevel <= 0.20
                     ? "#ff453a"
-                    : batteryLevel <= 0.30
-                        ? "#ffd60a"
-                        : "#f2f2f7"
+                    : batteryLevel <= 0.30 ? "#ffd60a" : "#f2f2f7"
             property color batteryShellColor: !batteryCharging && batteryLevel <= 0.20
-                ? "#ff453a"
-                : "#d1d1d6"
+                ? "#ff453a" : "#d1d1d6"
             property int lastBatteryState: -1
             property int lastBatteryPercent: -1
             property string batteryEventText: "Battery"
 
-            // Prefer a playing MPRIS player, but keep the first player around
-            // while paused/stopped so pause events can still show its metadata.
+            // ---------- MEDIA ----------
             property var activePlayer: {
                 var players = Mpris.players.values
                 for (var i = 0; i < players.length; ++i) {
@@ -87,38 +79,27 @@ ShellRoot {
                 ((activePlayer.trackTitle || "") !== "" || activePlayer.canControl)
             property bool musicPlaying: activePlayer !== null && activePlayer.isPlaying
             property string musicTitle: activePlayer
-                ? (activePlayer.trackTitle || activePlayer.identity || "Now Playing")
-                : ""
+                ? (activePlayer.trackTitle || activePlayer.identity || "Now Playing") : ""
             property string musicArtist: activePlayer
-                ? (activePlayer.trackArtist || activePlayer.trackAlbumArtist || "")
-                : ""
+                ? (activePlayer.trackArtist || activePlayer.trackAlbumArtist || "") : ""
             property string musicArtRaw: activePlayer && activePlayer.trackArtUrl
-                ? activePlayer.trackArtUrl.toString()
-                : ""
+                ? activePlayer.trackArtUrl.toString() : ""
             property string cachedMusicArtUrl: ""
             property url musicArtSource: cachedMusicArtUrl !== ""
-                ? cachedMusicArtUrl
-                : normalizeArtUrl(musicArtRaw)
+                ? cachedMusicArtUrl : normalizeArtUrl(musicArtRaw)
             property real musicPosition: 0
             property real musicLength: activePlayer && activePlayer.lengthSupported
-                ? Math.max(0, activePlayer.length)
-                : 0
+                ? Math.max(0, activePlayer.length) : 0
             property real musicProgress: musicLength > 0
-                ? Math.max(0, Math.min(1, musicPosition / musicLength))
-                : 0
-
-            // A change to any important track identity field counts as a new
-            // song event. Pausing does not clear this key, so pause/resume is a
-            // separate playback-state event instead of a fake track change.
+                ? Math.max(0, Math.min(1, musicPosition / musicLength)) : 0
             property string musicEventKey: musicSessionAvailable
-                ? musicTitle + "\u241f" + musicArtist + "\u241f" + musicArtRaw
-                : ""
+                ? musicTitle + "\u241f" + musicArtist + "\u241f" + musicArtRaw : ""
             property string lastMusicEventKey: ""
             property bool musicEventInitialized: false
             property bool playbackStateInitialized: false
             property bool lastMusicPlaying: false
 
-            // Read-only volume and brightness observation.
+            // ---------- VOLUME / BRIGHTNESS ----------
             property int volumePercent: 0
             property bool volumeMuted: false
             property int lastVolumePercent: -1
@@ -126,7 +107,7 @@ ShellRoot {
             property int brightnessPercent: 0
             property int lastBrightnessPercent: -1
 
-            // Connectivity.
+            // ---------- CONNECTIVITY SUMMARY ----------
             property bool wifiAvailable: false
             property bool wifiEnabled: false
             property string wifiSsid: ""
@@ -143,27 +124,23 @@ ShellRoot {
                 var value = raw.toString()
                 if (value === "")
                     return ""
-                if (value.charAt(0) === "/")
-                    return "file://" + value
-                return value
+                return value.charAt(0) === "/" ? "file://" + value : value
             }
 
             function modeWidth(mode) {
-                if (mode === "music")
-                    return 530
-                if (mode === "connectivity")
-                    return 510
-                if (mode === "volume" || mode === "brightness")
-                    return 410
-                if (mode === "battery")
-                    return 360
-                if (mode === "bluetooth")
-                    return 460
+                if (mode === "music") return 530
+                if (mode === "wifiPanel" || mode === "bluetoothPanel") return 540
+                if (mode === "connectivity") return 510
+                if (mode === "volume" || mode === "brightness") return 410
+                if (mode === "battery") return 360
+                if (mode === "bluetooth") return 460
                 return 540
             }
 
             function modeHeight(mode) {
-                return mode === "music" ? musicHeight : normalHeight
+                if (mode === "music") return musicHeight
+                if (mode === "wifiPanel" || mode === "bluetoothPanel") return connectivityPanelHeight
+                return normalHeight
             }
 
             property real targetWidth: expanded ? modeWidth(displayMode) : notchWidth
@@ -176,72 +153,7 @@ ShellRoot {
             width: targetWidth
             height: targetHeight
 
-            onMusicPlayingChanged: {
-                if (!playbackStateInitialized) {
-                    playbackStateInitialized = true
-                    lastMusicPlaying = musicPlaying
-                    if (musicPlaying && musicSessionAvailable) {
-                        musicEventInitialized = true
-                        lastMusicEventKey = musicEventKey
-                        refreshArtwork()
-                        showTransient("music", 2600)
-                    }
-                    return
-                }
-
-                var wasPlaying = lastMusicPlaying
-                lastMusicPlaying = musicPlaying
-
-                if (musicPlaying !== wasPlaying && musicSessionAvailable) {
-                    refreshArtwork()
-                    // Resume gets the normal new-track duration; pause/stop is
-                    // slightly shorter but still long enough to read the state.
-                    showTransient("music", musicPlaying ? 2600 : 2200)
-                }
-
-                if (!musicPlaying && selectedMode === "music")
-                    selectedMode = "normal"
-            }
-
-            onMusicEventKeyChanged: {
-                if (!musicPlaying || musicEventKey === "")
-                    return
-
-                if (!musicEventInitialized) {
-                    musicEventInitialized = true
-                    lastMusicEventKey = musicEventKey
-                    showTransient("music", 2600)
-                    return
-                }
-
-                if (musicEventKey !== lastMusicEventKey) {
-                    lastMusicEventKey = musicEventKey
-                    showTransient("music", 2600)
-                }
-            }
-
-            onMusicArtRawChanged: refreshArtwork()
-
-            function refreshArtwork() {
-                cachedMusicArtUrl = ""
-                if (artFetch.running)
-                    artFetch.running = false
-
-                var raw = musicArtRaw
-                if (raw.indexOf("http://") !== 0 && raw.indexOf("https://") !== 0)
-                    return
-
-                // Image tries the remote URL immediately. This cache is a
-                // fallback for Qt/player combinations that reject remote art.
-                artFetch.command = [
-                    "bash", "-lc",
-                    "set -e; url=\"$1\"; command -v curl >/dev/null 2>&1 || exit 0; dir=\"${XDG_CACHE_HOME:-$HOME/.cache}/notch-quickshell/art\"; mkdir -p \"$dir\"; key=$(printf '%s' \"$url\" | sha256sum | cut -d' ' -f1); out=\"$dir/$key\"; if [ ! -s \"$out\" ]; then tmp=\"$out.tmp.$$\"; curl -LfsS --max-time 8 \"$url\" -o \"$tmp\" && mv \"$tmp\" \"$out\" || { rm -f \"$tmp\"; exit 0; }; fi; [ -s \"$out\" ] && printf 'file://%s' \"$out\"",
-                    "notch-art",
-                    raw
-                ]
-                artFetch.running = true
-            }
-
+            // ---------- MODE / EVENT LOGIC ----------
             function showTransient(mode, duration) {
                 transientMode = mode
                 transientTimer.interval = duration || 1850
@@ -262,6 +174,14 @@ ShellRoot {
                 }
             }
 
+            function openConnectivityPanel(kind) {
+                transientTimer.stop()
+                transientMode = ""
+                selectedMode = kind === "bluetooth" ? "bluetoothPanel" : "wifiPanel"
+                hoverHold = true
+                Qt.callLater(function() { connectivityDetails.refreshCurrent(true) })
+            }
+
             function formatTime(seconds) {
                 if (!isFinite(seconds) || seconds < 0)
                     seconds = 0
@@ -271,22 +191,78 @@ ShellRoot {
                 return mins + ":" + (secs < 10 ? "0" : "") + secs
             }
 
+            onMusicPlayingChanged: {
+                if (!playbackStateInitialized) {
+                    playbackStateInitialized = true
+                    lastMusicPlaying = musicPlaying
+                    if (musicPlaying && musicSessionAvailable) {
+                        musicEventInitialized = true
+                        lastMusicEventKey = musicEventKey
+                        refreshArtwork()
+                        showTransient("music", 2600)
+                    }
+                    return
+                }
+
+                var wasPlaying = lastMusicPlaying
+                lastMusicPlaying = musicPlaying
+                if (musicPlaying !== wasPlaying && musicSessionAvailable) {
+                    refreshArtwork()
+                    showTransient("music", musicPlaying ? 2600 : 2200)
+                }
+                if (!musicPlaying && selectedMode === "music")
+                    selectedMode = "normal"
+            }
+
+            onMusicEventKeyChanged: {
+                if (!musicPlaying || musicEventKey === "")
+                    return
+                if (!musicEventInitialized) {
+                    musicEventInitialized = true
+                    lastMusicEventKey = musicEventKey
+                    showTransient("music", 2600)
+                    return
+                }
+                if (musicEventKey !== lastMusicEventKey) {
+                    lastMusicEventKey = musicEventKey
+                    showTransient("music", 2600)
+                }
+            }
+
+            onMusicArtRawChanged: refreshArtwork()
+
+            function refreshArtwork() {
+                cachedMusicArtUrl = ""
+                if (artFetch.running)
+                    artFetch.running = false
+                var raw = musicArtRaw
+                if (raw.indexOf("http://") !== 0 && raw.indexOf("https://") !== 0)
+                    return
+                artFetch.command = [
+                    "bash", "-lc",
+                    "set -e; url=\"$1\"; command -v curl >/dev/null 2>&1 || exit 0; " +
+                    "dir=\"${XDG_CACHE_HOME:-$HOME/.cache}/notch-quickshell/art\"; mkdir -p \"$dir\"; " +
+                    "key=$(printf '%s' \"$url\" | sha256sum | cut -d' ' -f1); out=\"$dir/$key\"; " +
+                    "if [ ! -s \"$out\" ]; then tmp=\"$out.tmp.$$\"; " +
+                    "curl -LfsS --max-time 8 \"$url\" -o \"$tmp\" && mv \"$tmp\" \"$out\" || { rm -f \"$tmp\"; exit 0; }; fi; " +
+                    "[ -s \"$out\" ] && printf 'file://%s' \"$out\"",
+                    "notch-art", raw
+                ]
+                artFetch.running = true
+            }
+
             function consumeVolume(raw) {
                 var match = raw.match(/Volume:\s*([0-9.]+)/)
-                if (!match)
-                    return
-
+                if (!match) return
                 var percent = Math.max(0, Math.min(100, Math.round(parseFloat(match[1]) * 100)))
                 var muted = raw.indexOf("[MUTED]") !== -1
                 volumePercent = percent
                 volumeMuted = muted
-
                 if (lastVolumePercent < 0) {
                     lastVolumePercent = percent
                     lastVolumeMuted = muted
                     return
                 }
-
                 if (percent !== lastVolumePercent || muted !== lastVolumeMuted) {
                     lastVolumePercent = percent
                     lastVolumeMuted = muted
@@ -296,17 +272,13 @@ ShellRoot {
 
             function consumeBrightness(raw) {
                 var percent = parseInt(raw.trim())
-                if (isNaN(percent))
-                    return
-
+                if (isNaN(percent)) return
                 percent = Math.max(0, Math.min(100, percent))
                 brightnessPercent = percent
-
                 if (lastBrightnessPercent < 0) {
                     lastBrightnessPercent = percent
                     return
                 }
-
                 if (percent !== lastBrightnessPercent) {
                     lastBrightnessPercent = percent
                     showTransient("brightness", 1850)
@@ -321,7 +293,6 @@ ShellRoot {
                     wifiSsid = ""
                     return
                 }
-
                 wifiAvailable = true
                 wifiEnabled = lines[0] === "enabled"
                 wifiSsid = lines.length > 1 ? lines[1].trim() : ""
@@ -335,7 +306,6 @@ ShellRoot {
                     bluetoothDevice = ""
                     return
                 }
-
                 bluetoothAvailable = true
                 bluetoothPowered = lines[0] === "yes"
                 bluetoothDevice = lines.length > 1 ? lines.slice(1).join(" ").trim() : ""
@@ -345,14 +315,15 @@ ShellRoot {
                     lastBluetoothDevice = bluetoothDevice
                     return
                 }
-
                 if (bluetoothDevice !== lastBluetoothDevice) {
-                    if (bluetoothDevice !== "") {
-                        bluetoothEventText = bluetoothDevice
-                        showTransient("bluetooth", 1850)
-                    } else if (lastBluetoothDevice !== "") {
-                        bluetoothEventText = lastBluetoothDevice + " disconnected"
-                        showTransient("bluetooth", 1850)
+                    if (selectedMode !== "bluetoothPanel") {
+                        if (bluetoothDevice !== "") {
+                            bluetoothEventText = bluetoothDevice
+                            showTransient("bluetooth", 1850)
+                        } else if (lastBluetoothDevice !== "") {
+                            bluetoothEventText = lastBluetoothDevice + " disconnected"
+                            showTransient("bluetooth", 1850)
+                        }
                     }
                     lastBluetoothDevice = bluetoothDevice
                 }
@@ -361,23 +332,18 @@ ShellRoot {
             function crossedBatteryThreshold(previous, current) {
                 var thresholds = [80, 50, 20, 10, 5, 2]
                 for (var i = 0; i < thresholds.length; ++i) {
-                    var threshold = thresholds[i]
-                    if (previous > threshold && current <= threshold)
-                        return threshold
+                    if (previous > thresholds[i] && current <= thresholds[i])
+                        return thresholds[i]
                 }
                 return -1
             }
 
             function checkBatteryState() {
-                if (!battery || !battery.ready)
-                    return
-
+                if (!battery || !battery.ready) return
                 var percent = Math.round(batteryLevel * 100)
                 if (lastBatteryPercent < 0) {
                     lastBatteryPercent = percent
                 } else {
-                    // Milestones are downward/discharging alerts. This avoids
-                    // replaying every warning while the laptop is charging up.
                     if (!batteryCharging && percent < lastBatteryPercent) {
                         var threshold = crossedBatteryThreshold(lastBatteryPercent, percent)
                         if (threshold >= 0) {
@@ -393,8 +359,7 @@ ShellRoot {
                     lastBatteryState = state
                     return
                 }
-                if (state === lastBatteryState)
-                    return
+                if (state === lastBatteryState) return
 
                 var wasCharging = lastBatteryState === UPowerDeviceState.Charging ||
                     lastBatteryState === UPowerDeviceState.PendingCharge
@@ -408,18 +373,15 @@ ShellRoot {
                     batteryEventText = "On Battery"
                     showTransient("battery", 1850)
                 }
-
                 lastBatteryState = state
             }
 
+            // ---------- POINTER ----------
             HoverHandler {
                 id: hover
-
                 onHoveredChanged: {
                     if (hovered) {
                         hoverExitTimer.stop()
-                        // A genuinely new hover always begins on date/time. A
-                        // quick re-entry during the linger keeps the current page.
                         if (!island.hoverHold && island.transientMode === "")
                             island.resetToNormal()
                         island.hoverHold = true
@@ -430,10 +392,16 @@ ShellRoot {
             }
 
             MouseArea {
-                anchors.fill: parent
+                anchors {
+                    left: parent.left
+                    right: parent.right
+                    top: parent.top
+                }
+                height: island.normalHeight
                 onClicked: island.cycleMode()
             }
 
+            // ---------- TIMERS / PROBES ----------
             Timer {
                 id: hoverExitTimer
                 interval: 900
@@ -464,12 +432,10 @@ ShellRoot {
                 onTriggered: island.checkBatteryState()
             }
 
-            // MPRIS position is sampled while playing so the progress line is
-            // fluid even when the player does not emit continuous updates.
             Timer {
                 interval: 180
                 repeat: true
-                running: island.musicPlaying
+                running: island.musicPlaying || island.displayMode === "music"
                 triggeredOnStart: true
                 onTriggered: {
                     if (island.activePlayer && island.activePlayer.positionSupported)
@@ -479,11 +445,7 @@ ShellRoot {
                 }
             }
 
-            // Fast baseline polling makes the first hardware-key press appear
-            // quickly. While the matching popup is visible, switch into a
-            // short live cadence so repeated key presses track nearly instantly.
             Timer {
-                id: volumePollTimer
                 interval: island.displayMode === "volume" ? 45 : 120
                 repeat: true
                 running: true
@@ -494,13 +456,10 @@ ShellRoot {
             Process {
                 id: volumeProbe
                 command: ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"]
-                stdout: StdioCollector {
-                    onStreamFinished: island.consumeVolume(text)
-                }
+                stdout: StdioCollector { onStreamFinished: island.consumeVolume(text) }
             }
 
             Timer {
-                id: brightnessPollTimer
                 interval: island.displayMode === "brightness" ? 60 : 140
                 repeat: true
                 running: true
@@ -510,17 +469,12 @@ ShellRoot {
 
             Process {
                 id: brightnessProbe
-                command: [
-                    "bash", "-lc",
-                    "brightnessctl -m 2>/dev/null | head -n1 | cut -d, -f4 | tr -d '%'"
-                ]
-                stdout: StdioCollector {
-                    onStreamFinished: island.consumeBrightness(text)
-                }
+                command: ["bash", "-lc", "brightnessctl -m 2>/dev/null | head -n1 | cut -d, -f4 | tr -d '%'"]
+                stdout: StdioCollector { onStreamFinished: island.consumeBrightness(text) }
             }
 
             Timer {
-                interval: 2200
+                interval: 1200
                 repeat: true
                 running: true
                 triggeredOnStart: true
@@ -534,32 +488,21 @@ ShellRoot {
                 id: wifiProbe
                 command: [
                     "bash", "-lc",
-                    "command -v nmcli >/dev/null 2>&1 || exit 0; nmcli -t -f WIFI g 2>/dev/null; nmcli -t -f ACTIVE,SSID dev wifi 2>/dev/null | sed -n 's/^yes://p' | head -n1"
+                    "command -v nmcli >/dev/null 2>&1 || exit 0; nmcli -t -f WIFI g 2>/dev/null; " +
+                    "nmcli -t -f ACTIVE,SSID dev wifi 2>/dev/null | sed -n 's/^yes://p' | head -n1"
                 ]
-                stdout: StdioCollector {
-                    onStreamFinished: island.consumeWifi(text)
-                }
+                stdout: StdioCollector { onStreamFinished: island.consumeWifi(text) }
             }
 
             Process {
                 id: bluetoothProbe
                 command: [
                     "bash", "-lc",
-                    "command -v bluetoothctl >/dev/null 2>&1 || exit 0; bluetoothctl show 2>/dev/null | awk '/Powered:/ {print $2; exit}'; bluetoothctl devices Connected 2>/dev/null | sed -n '1s/^Device [^ ]* //p'"
+                    "command -v bluetoothctl >/dev/null 2>&1 || exit 0; " +
+                    "bluetoothctl show 2>/dev/null | awk '/Powered:/ {print $2; exit}'; " +
+                    "bluetoothctl devices Connected 2>/dev/null | sed -n '1s/^Device [^ ]* //p'"
                 ]
-                stdout: StdioCollector {
-                    onStreamFinished: island.consumeBluetooth(text)
-                }
-            }
-
-            Process {
-                id: wifiToggle
-                onRunningChanged: if (!running && !wifiProbe.running) wifiProbe.running = true
-            }
-
-            Process {
-                id: bluetoothToggle
-                onRunningChanged: if (!running && !bluetoothProbe.running) bluetoothProbe.running = true
+                stdout: StdioCollector { onStreamFinished: island.consumeBluetooth(text) }
             }
 
             Process {
@@ -567,12 +510,12 @@ ShellRoot {
                 stdout: StdioCollector {
                     onStreamFinished: {
                         var value = text.trim()
-                        if (value !== "")
-                            island.cachedMusicArtUrl = value
+                        if (value !== "") island.cachedMusicArtUrl = value
                     }
                 }
             }
 
+            // ---------- BLACK NOTCH SHAPE ----------
             Shape {
                 id: notchShape
                 anchors.fill: parent
@@ -619,9 +562,7 @@ ShellRoot {
                     color: "#c7c7cc"
                     font.pixelSize: 13
                     font.weight: Font.Medium
-                    Behavior on opacity {
-                        NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
-                    }
+                    Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
                 }
 
                 // ---------- NORMAL ----------
@@ -634,17 +575,8 @@ ShellRoot {
                     visible: opacity > 0.01
                     enabled: active
                     transformOrigin: Item.Top
-
-                    Behavior on opacity {
-                        NumberAnimation { duration: 145; easing.type: Easing.OutCubic }
-                    }
-                    Behavior on scale {
-                        NumberAnimation {
-                            duration: 190
-                            easing.type: Easing.OutBack
-                            easing.overshoot: 0.45
-                        }
-                    }
+                    Behavior on opacity { NumberAnimation { duration: 145; easing.type: Easing.OutCubic } }
+                    Behavior on scale { NumberAnimation { duration: 190; easing.type: Easing.OutBack; easing.overshoot: 0.45 } }
 
                     Item {
                         id: normalLeft
@@ -654,11 +586,7 @@ ShellRoot {
 
                         Text {
                             id: normalTime
-                            anchors {
-                                left: parent.left
-                                leftMargin: 24
-                                verticalCenter: parent.verticalCenter
-                            }
+                            anchors { left: parent.left; leftMargin: 24; verticalCenter: parent.verticalCenter }
                             text: Qt.formatDateTime(clock.date, "HH:mm")
                             color: "white"
                             font.pixelSize: 17
@@ -666,11 +594,7 @@ ShellRoot {
                         }
 
                         Item {
-                            anchors {
-                                left: normalTime.right
-                                leftMargin: 10
-                                verticalCenter: parent.verticalCenter
-                            }
+                            anchors { left: normalTime.right; leftMargin: 10; verticalCenter: parent.verticalCenter }
                             width: island.batteryCharging ? 48 : 36
                             height: 18
                             visible: island.battery && island.battery.ready
@@ -684,38 +608,20 @@ ShellRoot {
                                 color: "transparent"
                                 border.width: 1
                                 border.color: island.batteryShellColor
-
-                                Behavior on border.color {
-                                    ColorAnimation { duration: 180 }
-                                }
+                                Behavior on border.color { ColorAnimation { duration: 180 } }
 
                                 Rectangle {
-                                    anchors {
-                                        left: parent.left
-                                        leftMargin: 3
-                                        top: parent.top
-                                        topMargin: 3
-                                        bottom: parent.bottom
-                                        bottomMargin: 3
-                                    }
+                                    anchors { left: parent.left; leftMargin: 3; top: parent.top; topMargin: 3; bottom: parent.bottom; bottomMargin: 3 }
                                     width: Math.max(0, (normalBatteryBody.width - 6) * island.batteryLevel)
                                     radius: 1.7
                                     color: island.batteryColor
-                                    Behavior on width {
-                                        NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
-                                    }
-                                    Behavior on color {
-                                        ColorAnimation { duration: 180 }
-                                    }
+                                    Behavior on width { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                                    Behavior on color { ColorAnimation { duration: 180 } }
                                 }
                             }
 
                             Rectangle {
-                                anchors {
-                                    left: normalBatteryBody.right
-                                    leftMargin: 1
-                                    verticalCenter: parent.verticalCenter
-                                }
+                                anchors { left: normalBatteryBody.right; leftMargin: 1; verticalCenter: parent.verticalCenter }
                                 width: 3
                                 height: 7
                                 radius: 1.5
@@ -726,12 +632,7 @@ ShellRoot {
                     }
 
                     Text {
-                        anchors {
-                            right: parent.right
-                            rightMargin: 24
-                            top: parent.top
-                            topMargin: 13
-                        }
+                        anchors { right: parent.right; rightMargin: 24; top: parent.top; topMargin: 13 }
                         text: Qt.formatDateTime(clock.date, "ddd, d MMM")
                         color: "#b8b8bd"
                         font.pixelSize: 17
@@ -742,78 +643,44 @@ ShellRoot {
                 // ---------- MUSIC ----------
                 Item {
                     id: musicMode
-                    property bool active: island.displayMode === "music" &&
-                        island.musicSessionAvailable && island.expanded
+                    property bool active: island.displayMode === "music" && island.musicSessionAvailable && island.expanded
                     anchors.fill: parent
                     opacity: active ? 1 : 0
                     scale: active ? 1 : 0.972
                     visible: opacity > 0.01
                     enabled: active
                     transformOrigin: Item.Top
-
-                    Behavior on opacity {
-                        NumberAnimation { duration: 115; easing.type: Easing.OutCubic }
-                    }
-                    Behavior on scale {
-                        NumberAnimation {
-                            duration: 165
-                            easing.type: Easing.OutBack
-                            easing.overshoot: 0.32
-                        }
-                    }
+                    Behavior on opacity { NumberAnimation { duration: 115; easing.type: Easing.OutCubic } }
+                    Behavior on scale { NumberAnimation { duration: 165; easing.type: Easing.OutBack; easing.overshoot: 0.32 } }
 
                     Row {
-                        anchors {
-                            left: parent.left
-                            leftMargin: 24
-                            top: parent.top
-                            topMargin: 12
-                        }
+                        anchors { left: parent.left; leftMargin: 24; top: parent.top; topMargin: 12 }
                         spacing: 17
 
                         Text {
                             text: "‹"
                             color: island.activePlayer && island.activePlayer.canGoPrevious ? "white" : "#55555a"
                             font.pixelSize: 25
-                            MouseArea {
-                                anchors.fill: parent
-                                enabled: island.activePlayer && island.activePlayer.canGoPrevious
-                                onClicked: island.activePlayer.previous()
-                            }
+                            MouseArea { anchors.fill: parent; enabled: island.activePlayer && island.activePlayer.canGoPrevious; onClicked: island.activePlayer.previous() }
                         }
-
                         Text {
                             text: island.musicPlaying ? "Ⅱ" : "▶"
                             color: island.activePlayer && island.activePlayer.canTogglePlaying ? "white" : "#55555a"
                             font.pixelSize: island.musicPlaying ? 16 : 15
                             font.weight: Font.Medium
                             anchors.verticalCenter: parent.verticalCenter
-                            MouseArea {
-                                anchors.fill: parent
-                                enabled: island.activePlayer && island.activePlayer.canTogglePlaying
-                                onClicked: island.activePlayer.togglePlaying()
-                            }
+                            MouseArea { anchors.fill: parent; enabled: island.activePlayer && island.activePlayer.canTogglePlaying; onClicked: island.activePlayer.togglePlaying() }
                         }
-
                         Text {
                             text: "›"
                             color: island.activePlayer && island.activePlayer.canGoNext ? "white" : "#55555a"
                             font.pixelSize: 25
-                            MouseArea {
-                                anchors.fill: parent
-                                enabled: island.activePlayer && island.activePlayer.canGoNext
-                                onClicked: island.activePlayer.next()
-                            }
+                            MouseArea { anchors.fill: parent; enabled: island.activePlayer && island.activePlayer.canGoNext; onClicked: island.activePlayer.next() }
                         }
                     }
 
                     Text {
-                        anchors {
-                            right: parent.right
-                            rightMargin: 24
-                            top: parent.top
-                            topMargin: 17
-                        }
+                        anchors { right: parent.right; rightMargin: 24; top: parent.top; topMargin: 17 }
                         text: island.musicPlaying
                             ? island.formatTime(island.musicPosition) + " / " + island.formatTime(island.musicLength)
                             : "Paused · " + island.formatTime(island.musicPosition) + " / " + island.formatTime(island.musicLength)
@@ -824,12 +691,7 @@ ShellRoot {
 
                     Item {
                         id: albumArt
-                        anchors {
-                            left: parent.left
-                            leftMargin: 24
-                            top: parent.top
-                            topMargin: 52
-                        }
+                        anchors { left: parent.left; leftMargin: 24; top: parent.top; topMargin: 52 }
                         width: 68
                         height: 68
 
@@ -837,15 +699,8 @@ ShellRoot {
                             anchors.fill: parent
                             radius: 14
                             color: "#1c1c1e"
-                            Text {
-                                anchors.centerIn: parent
-                                visible: artImage.status !== Image.Ready
-                                text: "♪"
-                                color: "#636366"
-                                font.pixelSize: 25
-                            }
+                            Text { anchors.centerIn: parent; visible: artImage.status !== Image.Ready; text: "♪"; color: "#636366"; font.pixelSize: 25 }
                         }
-
                         Image {
                             id: artImage
                             anchors.fill: parent
@@ -859,31 +714,14 @@ ShellRoot {
                             sourceSize.width: 160
                             sourceSize.height: 160
                             opacity: status === Image.Ready ? 1 : 0
-                            Behavior on opacity {
-                                NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
-                            }
+                            Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
                         }
-
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: 14
-                            color: "transparent"
-                            border.width: 3
-                            border.color: "#000000"
-                        }
+                        Rectangle { anchors.fill: parent; radius: 14; color: "transparent"; border.width: 3; border.color: "#000000" }
                     }
 
                     Item {
-                        anchors {
-                            left: albumArt.right
-                            leftMargin: 15
-                            right: parent.right
-                            rightMargin: 24
-                            top: parent.top
-                            topMargin: 53
-                        }
+                        anchors { left: albumArt.right; leftMargin: 15; right: parent.right; rightMargin: 24; top: parent.top; topMargin: 53 }
                         height: 67
-
                         Text {
                             id: musicTitleText
                             anchors { left: parent.left; right: parent.right; top: parent.top }
@@ -894,14 +732,8 @@ ShellRoot {
                             elide: Text.ElideRight
                             maximumLineCount: 1
                         }
-
                         Text {
-                            anchors {
-                                left: parent.left
-                                right: parent.right
-                                top: musicTitleText.bottom
-                                topMargin: 3
-                            }
+                            anchors { left: parent.left; right: parent.right; top: musicTitleText.bottom; topMargin: 3 }
                             text: island.musicArtist
                             color: "#8e8e93"
                             font.pixelSize: 12
@@ -909,32 +741,23 @@ ShellRoot {
                             elide: Text.ElideRight
                             maximumLineCount: 1
                         }
-
                         Rectangle {
-                            anchors {
-                                left: parent.left
-                                right: parent.right
-                                bottom: parent.bottom
-                                bottomMargin: 4
-                            }
+                            anchors { left: parent.left; right: parent.right; bottom: parent.bottom; bottomMargin: 4 }
                             height: 4
                             radius: 2
                             color: "#2c2c2e"
-
                             Rectangle {
                                 width: parent.width * island.musicProgress
                                 height: parent.height
                                 radius: parent.radius
                                 color: "#f2f2f7"
-                                Behavior on width {
-                                    NumberAnimation { duration: 180; easing.type: Easing.Linear }
-                                }
+                                Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.Linear } }
                             }
                         }
                     }
                 }
 
-                // ---------- CONNECTIVITY ----------
+                // ---------- CONNECTIVITY SUMMARY ----------
                 Item {
                     id: connectivityMode
                     property bool active: island.displayMode === "connectivity" && island.expanded
@@ -944,54 +767,31 @@ ShellRoot {
                     visible: opacity > 0.01
                     enabled: active
                     transformOrigin: Item.Top
-
-                    Behavior on opacity {
-                        NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
-                    }
-                    Behavior on scale {
-                        NumberAnimation {
-                            duration: 185
-                            easing.type: Easing.OutBack
-                            easing.overshoot: 0.4
-                        }
-                    }
+                    Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                    Behavior on scale { NumberAnimation { duration: 185; easing.type: Easing.OutBack; easing.overshoot: 0.4 } }
 
                     Item {
                         anchors { left: parent.left; top: parent.top }
                         width: island.wingWidth
                         height: island.normalHeight
-
                         Rectangle {
                             anchors { left: parent.left; leftMargin: 24; verticalCenter: parent.verticalCenter }
-                            width: 7
-                            height: 7
-                            radius: 3.5
+                            width: 7; height: 7; radius: 3.5
                             color: island.wifiEnabled ? "#30d158" : "#636366"
                             Behavior on color { ColorAnimation { duration: 180 } }
                         }
-
                         Text {
-                            anchors {
-                                left: parent.left
-                                leftMargin: 39
-                                right: parent.right
-                                rightMargin: 12
-                                verticalCenter: parent.verticalCenter
-                            }
+                            anchors { left: parent.left; leftMargin: 39; right: parent.right; rightMargin: 12; verticalCenter: parent.verticalCenter }
                             text: island.wifiSsid !== "" ? island.wifiSsid : "Wi-Fi"
                             color: "#e8e8ed"
                             font.pixelSize: 14
                             font.weight: Font.Medium
                             elide: Text.ElideRight
                         }
-
                         MouseArea {
                             anchors.fill: parent
-                            enabled: island.wifiAvailable && !wifiToggle.running
-                            onClicked: {
-                                wifiToggle.command = ["nmcli", "radio", "wifi", island.wifiEnabled ? "off" : "on"]
-                                wifiToggle.running = true
-                            }
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: island.openConnectivityPanel("wifi")
                         }
                     }
 
@@ -999,24 +799,14 @@ ShellRoot {
                         anchors { right: parent.right; top: parent.top }
                         width: island.wingWidth
                         height: island.normalHeight
-
                         Rectangle {
                             anchors { right: parent.right; rightMargin: 24; verticalCenter: parent.verticalCenter }
-                            width: 7
-                            height: 7
-                            radius: 3.5
+                            width: 7; height: 7; radius: 3.5
                             color: island.bluetoothPowered ? "#30d158" : "#636366"
                             Behavior on color { ColorAnimation { duration: 180 } }
                         }
-
                         Text {
-                            anchors {
-                                left: parent.left
-                                leftMargin: 12
-                                right: parent.right
-                                rightMargin: 39
-                                verticalCenter: parent.verticalCenter
-                            }
+                            anchors { left: parent.left; leftMargin: 12; right: parent.right; rightMargin: 39; verticalCenter: parent.verticalCenter }
                             text: island.bluetoothDevice !== "" ? island.bluetoothDevice : "Bluetooth"
                             color: "#e8e8ed"
                             font.pixelSize: 14
@@ -1024,19 +814,30 @@ ShellRoot {
                             horizontalAlignment: Text.AlignRight
                             elide: Text.ElideLeft
                         }
-
                         MouseArea {
                             anchors.fill: parent
-                            enabled: island.bluetoothAvailable && !bluetoothToggle.running
-                            onClicked: {
-                                bluetoothToggle.command = ["bluetoothctl", "power", island.bluetoothPowered ? "off" : "on"]
-                                bluetoothToggle.running = true
-                            }
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: island.openConnectivityPanel("bluetooth")
                         }
                     }
                 }
 
-                // ---------- TEMPORARY VOLUME ----------
+                // ---------- EXPANDED WI-FI / BLUETOOTH ----------
+                ConnectivityPanel {
+                    id: connectivityDetails
+                    anchors.fill: parent
+                    active: (island.displayMode === "wifiPanel" || island.displayMode === "bluetoothPanel") && island.expanded
+                    panelType: island.selectedMode === "bluetoothPanel" ? "bluetooth" : "wifi"
+                    wifiEnabled: island.wifiEnabled
+                    bluetoothPowered: island.bluetoothPowered
+                    onBackRequested: island.selectedMode = "connectivity"
+                    onStatusRefreshRequested: {
+                        if (!wifiProbe.running) wifiProbe.running = true
+                        if (!bluetoothProbe.running) bluetoothProbe.running = true
+                    }
+                }
+
+                // ---------- VOLUME ----------
                 Item {
                     id: volumeMode
                     property bool active: island.displayMode === "volume" && island.expanded
@@ -1048,39 +849,20 @@ ShellRoot {
                     Behavior on opacity { NumberAnimation { duration: 105; easing.type: Easing.OutCubic } }
                     Behavior on scale { NumberAnimation { duration: 145; easing.type: Easing.OutBack; easing.overshoot: 0.28 } }
 
-                    Text {
-                        anchors { left: parent.left; leftMargin: 24; top: parent.top; topMargin: 15 }
-                        text: island.volumeMuted ? "Muted" : "Volume"
-                        color: "white"
-                        font.pixelSize: 15
-                        font.weight: Font.Medium
-                    }
-
+                    Text { anchors { left: parent.left; leftMargin: 24; top: parent.top; topMargin: 15 }; text: island.volumeMuted ? "Muted" : "Volume"; color: "white"; font.pixelSize: 15; font.weight: Font.Medium }
                     Rectangle {
                         anchors { horizontalCenter: parent.horizontalCenter; top: parent.top; topMargin: 22 }
-                        width: 104
-                        height: 4
-                        radius: 2
-                        color: "#343438"
+                        width: 104; height: 4; radius: 2; color: "#343438"
                         Rectangle {
                             width: parent.width * (island.volumeMuted ? 0 : island.volumePercent / 100)
-                            height: parent.height
-                            radius: parent.radius
-                            color: "#f2f2f7"
+                            height: parent.height; radius: parent.radius; color: "#f2f2f7"
                             Behavior on width { NumberAnimation { duration: 55; easing.type: Easing.OutCubic } }
                         }
                     }
-
-                    Text {
-                        anchors { right: parent.right; rightMargin: 24; top: parent.top; topMargin: 13 }
-                        text: island.volumeMuted ? "—" : island.volumePercent
-                        color: "#e8e8ed"
-                        font.pixelSize: 17
-                        font.weight: Font.Medium
-                    }
+                    Text { anchors { right: parent.right; rightMargin: 24; top: parent.top; topMargin: 13 }; text: island.volumeMuted ? "—" : island.volumePercent; color: "#e8e8ed"; font.pixelSize: 17; font.weight: Font.Medium }
                 }
 
-                // ---------- TEMPORARY BRIGHTNESS ----------
+                // ---------- BRIGHTNESS ----------
                 Item {
                     id: brightnessMode
                     property bool active: island.displayMode === "brightness" && island.expanded
@@ -1092,38 +874,20 @@ ShellRoot {
                     Behavior on opacity { NumberAnimation { duration: 105; easing.type: Easing.OutCubic } }
                     Behavior on scale { NumberAnimation { duration: 145; easing.type: Easing.OutBack; easing.overshoot: 0.28 } }
 
-                    Text {
-                        anchors { left: parent.left; leftMargin: 24; top: parent.top; topMargin: 13 }
-                        text: "☀"
-                        color: "white"
-                        font.pixelSize: 18
-                    }
-
+                    Text { anchors { left: parent.left; leftMargin: 24; top: parent.top; topMargin: 13 }; text: "☀"; color: "white"; font.pixelSize: 18 }
                     Rectangle {
                         anchors { horizontalCenter: parent.horizontalCenter; top: parent.top; topMargin: 22 }
-                        width: 112
-                        height: 4
-                        radius: 2
-                        color: "#343438"
+                        width: 112; height: 4; radius: 2; color: "#343438"
                         Rectangle {
                             width: parent.width * (island.brightnessPercent / 100)
-                            height: parent.height
-                            radius: parent.radius
-                            color: "#f2f2f7"
+                            height: parent.height; radius: parent.radius; color: "#f2f2f7"
                             Behavior on width { NumberAnimation { duration: 60; easing.type: Easing.OutCubic } }
                         }
                     }
-
-                    Text {
-                        anchors { right: parent.right; rightMargin: 24; top: parent.top; topMargin: 13 }
-                        text: island.brightnessPercent
-                        color: "#e8e8ed"
-                        font.pixelSize: 17
-                        font.weight: Font.Medium
-                    }
+                    Text { anchors { right: parent.right; rightMargin: 24; top: parent.top; topMargin: 13 }; text: island.brightnessPercent; color: "#e8e8ed"; font.pixelSize: 17; font.weight: Font.Medium }
                 }
 
-                // ---------- TEMPORARY BATTERY ----------
+                // ---------- BATTERY POPUP ----------
                 Item {
                     id: batteryMode
                     property bool active: island.displayMode === "battery" && island.expanded
@@ -1137,13 +901,11 @@ ShellRoot {
                     Text {
                         anchors { left: parent.left; leftMargin: 24; top: parent.top; topMargin: 14 }
                         text: island.batteryEventText
-                        color: island.batteryCharging ? "#30d158" :
-                               island.batteryLevel <= 0.20 ? "#ff453a" : "#e8e8ed"
+                        color: island.batteryCharging ? "#30d158" : island.batteryLevel <= 0.20 ? "#ff453a" : "#e8e8ed"
                         font.pixelSize: 16
                         font.weight: Font.Medium
                         Behavior on color { ColorAnimation { duration: 160 } }
                     }
-
                     Text {
                         anchors { right: parent.right; rightMargin: 24; top: parent.top; topMargin: 13 }
                         text: Math.round(island.batteryLevel * 100) + "%"
@@ -1154,7 +916,7 @@ ShellRoot {
                     }
                 }
 
-                // ---------- TEMPORARY BLUETOOTH ----------
+                // ---------- BLUETOOTH EVENT ----------
                 Item {
                     id: bluetoothMode
                     property bool active: island.displayMode === "bluetooth" && island.expanded
@@ -1165,14 +927,7 @@ ShellRoot {
                     Behavior on opacity { NumberAnimation { duration: 135; easing.type: Easing.OutCubic } }
                     Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutBack; easing.overshoot: 0.35 } }
 
-                    Text {
-                        anchors { left: parent.left; leftMargin: 24; top: parent.top; topMargin: 15 }
-                        text: "Bluetooth"
-                        color: "#e8e8ed"
-                        font.pixelSize: 15
-                        font.weight: Font.Medium
-                    }
-
+                    Text { anchors { left: parent.left; leftMargin: 24; top: parent.top; topMargin: 15 }; text: "Bluetooth"; color: "#e8e8ed"; font.pixelSize: 15; font.weight: Font.Medium }
                     Text {
                         anchors { right: parent.right; rightMargin: 24; top: parent.top; topMargin: 15 }
                         width: island.wingWidth - 30
@@ -1186,8 +941,7 @@ ShellRoot {
                 }
             }
 
-            // Soft spring-like horizontal motion. Music is intentionally faster
-            // because its larger card would otherwise feel heavy.
+            // Apple-like spring motion. Large downward cards move faster.
             Behavior on width {
                 NumberAnimation {
                     duration: island.largeMotion ? 185 : 285
@@ -1195,7 +949,6 @@ ShellRoot {
                     easing.overshoot: island.largeMotion ? 0.42 : 0.72
                 }
             }
-
             Behavior on height {
                 NumberAnimation {
                     duration: island.largeMotion ? 175 : 265
