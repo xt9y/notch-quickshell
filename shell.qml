@@ -17,9 +17,9 @@ ShellRoot {
 
         color: "transparent"
 
-        // The music page may grow downward, but only the normal notch height is
-        // reserved from Plasma/KWin. The extra music area overlays the desktop.
-        implicitHeight: 112
+        // Only the normal notch height is reserved from Plasma. Taller modes
+        // float over the desktop instead of pushing windows downward.
+        implicitHeight: 132
         exclusionMode: ExclusionMode.Normal
         exclusiveZone: 49
 
@@ -38,12 +38,17 @@ ShellRoot {
             property int notchWidth: 170
             property int collapsedVisualHeight: 44
             property int normalHeight: 48
-            property int musicHeight: 112
+            property int musicHeight: 132
             property int cornerRadius: 13
 
             property string selectedMode: "normal"
             property string transientMode: ""
             property string displayMode: transientMode !== "" ? transientMode : selectedMode
+
+            // Keep an expanded notch alive briefly after the pointer leaves.
+            // This removes the abrupt snap while still collapsing quickly.
+            property bool hoverHold: false
+            property bool expanded: hover.hovered || hoverHold || transientMode !== ""
 
             // Battery / charger state.
             property var battery: UPower.displayDevice
@@ -65,7 +70,7 @@ ShellRoot {
             property int lastBatteryState: -1
             property string batteryEventText: "Battery"
 
-            // Only expose a media page while a player is actively playing.
+            // Media is exposed only while something is actually playing.
             property var activePlayer: {
                 var players = Mpris.players.values
                 for (var i = 0; i < players.length; ++i) {
@@ -81,9 +86,13 @@ ShellRoot {
             property string musicArtist: activePlayer
                 ? (activePlayer.trackArtist || activePlayer.trackAlbumArtist || "")
                 : ""
-            property url musicArtUrl: activePlayer
-                ? normalizeArtUrl(activePlayer.trackArtUrl)
+            property string musicArtRaw: activePlayer && activePlayer.trackArtUrl
+                ? activePlayer.trackArtUrl.toString()
                 : ""
+            property string cachedMusicArtUrl: ""
+            property url musicArtSource: cachedMusicArtUrl !== ""
+                ? cachedMusicArtUrl
+                : normalizeArtUrl(musicArtRaw)
             property real musicPosition: 0
             property real musicLength: activePlayer && activePlayer.lengthSupported
                 ? Math.max(0, activePlayer.length)
@@ -111,27 +120,20 @@ ShellRoot {
             property bool bluetoothInitialized: false
             property string bluetoothEventText: "Bluetooth"
 
-            property bool expanded: hover.hovered || transientMode !== ""
-
             function normalizeArtUrl(raw) {
                 if (!raw)
                     return ""
-
                 var value = raw.toString()
                 if (value === "")
                     return ""
-
-                // Some players expose an absolute filesystem path instead of a
-                // file:// URL. QML Image needs a URL in that case.
                 if (value.charAt(0) === "/")
                     return "file://" + value
-
                 return value
             }
 
             function modeWidth(mode) {
                 if (mode === "music")
-                    return 520
+                    return 530
                 if (mode === "connectivity")
                     return 510
                 if (mode === "volume" || mode === "brightness")
@@ -150,16 +152,39 @@ ShellRoot {
             property real targetWidth: expanded ? modeWidth(displayMode) : notchWidth
             property real targetHeight: expanded ? modeHeight(displayMode) : collapsedVisualHeight
             property real wingWidth: (width - notchWidth) / 2
+            property bool largeMotion: targetHeight > normalHeight || height > normalHeight + 1
 
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
-
             width: targetWidth
             height: targetHeight
 
             onMusicPlayingChanged: {
                 if (!musicPlaying && selectedMode === "music")
                     selectedMode = "normal"
+            }
+
+            onMusicArtRawChanged: refreshArtwork()
+
+            function refreshArtwork() {
+                cachedMusicArtUrl = ""
+                if (artFetch.running)
+                    artFetch.running = false
+
+                var raw = musicArtRaw
+                if (raw.indexOf("http://") !== 0 && raw.indexOf("https://") !== 0)
+                    return
+
+                // Image tries the remote URL immediately. This background cache
+                // is a fallback for players/Qt builds that fail to render remote
+                // MPRIS artwork directly.
+                artFetch.command = [
+                    "bash", "-lc",
+                    "set -e; url=\"$1\"; command -v curl >/dev/null 2>&1 || exit 0; dir=\"${XDG_CACHE_HOME:-$HOME/.cache}/notch-quickshell/art\"; mkdir -p \"$dir\"; key=$(printf '%s' \"$url\" | sha256sum | cut -d' ' -f1); out=\"$dir/$key\"; if [ ! -s \"$out\" ]; then tmp=\"$out.tmp.$$\"; curl -LfsS --max-time 8 \"$url\" -o \"$tmp\" && mv \"$tmp\" \"$out\" || { rm -f \"$tmp\"; exit 0; }; fi; [ -s \"$out\" ] && printf 'file://%s' \"$out\"",
+                    "notch-art",
+                    raw
+                ]
+                artFetch.running = true
             }
 
             function showTransient(mode) {
@@ -286,7 +311,6 @@ ShellRoot {
                     lastBatteryState = state
                     return
                 }
-
                 if (state === lastBatteryState)
                     return
 
@@ -310,8 +334,16 @@ ShellRoot {
                 id: hover
 
                 onHoveredChanged: {
-                    if (!hovered && island.transientMode === "")
-                        island.resetToNormal()
+                    if (hovered) {
+                        hoverExitTimer.stop()
+                        // A genuinely new hover always begins on date/time. A
+                        // quick re-entry during the linger keeps the current page.
+                        if (!island.hoverHold && island.transientMode === "")
+                            island.resetToNormal()
+                        island.hoverHold = true
+                    } else {
+                        hoverExitTimer.restart()
+                    }
                 }
             }
 
@@ -321,12 +353,23 @@ ShellRoot {
             }
 
             Timer {
+                id: hoverExitTimer
+                interval: 900
+                repeat: false
+                onTriggered: {
+                    island.hoverHold = false
+                    if (island.transientMode === "")
+                        island.resetToNormal()
+                }
+            }
+
+            Timer {
                 id: transientTimer
-                interval: 1700
+                interval: 1850
                 repeat: false
                 onTriggered: {
                     island.transientMode = ""
-                    if (!hover.hovered)
+                    if (!hover.hovered && !island.hoverHold)
                         island.resetToNormal()
                 }
             }
@@ -339,9 +382,10 @@ ShellRoot {
                 onTriggered: island.checkBatteryState()
             }
 
-            // MPRIS position needs sampling while a track is playing.
+            // MPRIS position is sampled while playing so the progress line is
+            // fluid even when the player does not emit continuous updates.
             Timer {
-                interval: 250
+                interval: 180
                 repeat: true
                 running: island.musicPlaying
                 triggeredOnStart: true
@@ -431,6 +475,17 @@ ShellRoot {
                 onRunningChanged: if (!running && !bluetoothProbe.running) bluetoothProbe.running = true
             }
 
+            Process {
+                id: artFetch
+                stdout: StdioCollector {
+                    onStreamFinished: {
+                        var value = text.trim()
+                        if (value !== "")
+                            island.cachedMusicArtUrl = value
+                    }
+                }
+            }
+
             Shape {
                 id: notchShape
                 anchors.fill: parent
@@ -441,7 +496,6 @@ ShellRoot {
                     fillColor: "#000000"
                     startX: 0
                     startY: 0
-
                     PathLine { x: notchShape.width; y: 0 }
                     PathLine { x: notchShape.width; y: notchShape.height - island.cornerRadius }
                     PathQuad {
@@ -472,24 +526,42 @@ ShellRoot {
                         top: parent.top
                         topMargin: 15
                     }
-                    visible: island.musicPlaying && !island.expanded
+                    opacity: island.musicPlaying && !island.expanded ? 1 : 0
+                    visible: opacity > 0.01
                     text: "♪"
                     color: "#c7c7cc"
                     font.pixelSize: 13
                     font.weight: Font.Medium
+                    Behavior on opacity {
+                        NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+                    }
                 }
 
                 // ---------- NORMAL ----------
                 Item {
+                    id: normalMode
+                    property bool active: island.displayMode === "normal" && island.expanded
                     anchors.fill: parent
-                    visible: island.displayMode === "normal" && island.expanded
+                    opacity: active ? 1 : 0
+                    scale: active ? 1 : 0.985
+                    visible: opacity > 0.01
+                    enabled: active
+                    transformOrigin: Item.Top
+
+                    Behavior on opacity {
+                        NumberAnimation { duration: 145; easing.type: Easing.OutCubic }
+                    }
+                    Behavior on scale {
+                        NumberAnimation {
+                            duration: 190
+                            easing.type: Easing.OutBack
+                            easing.overshoot: 0.45
+                        }
+                    }
 
                     Item {
                         id: normalLeft
-                        anchors {
-                            left: parent.left
-                            top: parent.top
-                        }
+                        anchors { left: parent.left; top: parent.top }
                         width: island.wingWidth
                         height: island.normalHeight
 
@@ -518,10 +590,7 @@ ShellRoot {
 
                             Rectangle {
                                 id: normalBatteryBody
-                                anchors {
-                                    left: parent.left
-                                    verticalCenter: parent.verticalCenter
-                                }
+                                anchors { left: parent.left; verticalCenter: parent.verticalCenter }
                                 width: 30
                                 height: 15
                                 radius: 3.5
@@ -541,6 +610,12 @@ ShellRoot {
                                     width: Math.max(0, (normalBatteryBody.width - 6) * island.batteryLevel)
                                     radius: 1.7
                                     color: island.batteryColor
+                                    Behavior on width {
+                                        NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+                                    }
+                                    Behavior on color {
+                                        ColorAnimation { duration: 180 }
+                                    }
                                 }
                             }
 
@@ -574,10 +649,26 @@ ShellRoot {
 
                 // ---------- MUSIC ----------
                 Item {
+                    id: musicMode
+                    property bool active: island.displayMode === "music" && island.musicPlaying && island.expanded
                     anchors.fill: parent
-                    visible: island.displayMode === "music" && island.musicPlaying && island.expanded
+                    opacity: active ? 1 : 0
+                    scale: active ? 1 : 0.972
+                    visible: opacity > 0.01
+                    enabled: active
+                    transformOrigin: Item.Top
 
-                    // Top 48px row.
+                    Behavior on opacity {
+                        NumberAnimation { duration: 115; easing.type: Easing.OutCubic }
+                    }
+                    Behavior on scale {
+                        NumberAnimation {
+                            duration: 165
+                            easing.type: Easing.OutBack
+                            easing.overshoot: 0.32
+                        }
+                    }
+
                     Row {
                         anchors {
                             left: parent.left
@@ -636,54 +727,53 @@ ShellRoot {
                         font.weight: Font.Medium
                     }
 
-                    // Qt's Image loader is used directly so remote MPRIS artwork
-                    // from Spotify, Chromium, Firefox, etc. loads reliably.
                     Item {
                         id: albumArt
                         anchors {
                             left: parent.left
                             leftMargin: 24
                             top: parent.top
-                            topMargin: 50
+                            topMargin: 52
                         }
-                        width: 58
-                        height: 58
+                        width: 68
+                        height: 68
 
                         Rectangle {
                             anchors.fill: parent
-                            radius: 11
+                            radius: 14
                             color: "#1c1c1e"
-
                             Text {
                                 anchors.centerIn: parent
                                 visible: artImage.status !== Image.Ready
                                 text: "♪"
                                 color: "#636366"
-                                font.pixelSize: 23
+                                font.pixelSize: 25
                             }
                         }
 
                         Image {
                             id: artImage
                             anchors.fill: parent
-                            anchors.margins: 1
-                            source: island.musicArtUrl
+                            anchors.margins: 2
+                            source: island.musicArtSource
                             fillMode: Image.PreserveAspectCrop
                             asynchronous: true
                             cache: true
                             smooth: true
                             mipmap: true
-                            sourceSize.width: 116
-                            sourceSize.height: 116
+                            sourceSize.width: 160
+                            sourceSize.height: 160
+                            opacity: status === Image.Ready ? 1 : 0
+                            Behavior on opacity {
+                                NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+                            }
                         }
 
-                        // A rounded frame visually softens the artwork corners
-                        // without depending on an optional graphics-effects module.
                         Rectangle {
                             anchors.fill: parent
-                            radius: 11
+                            radius: 14
                             color: "transparent"
-                            border.width: 2
+                            border.width: 3
                             border.color: "#000000"
                         }
                     }
@@ -691,24 +781,20 @@ ShellRoot {
                     Item {
                         anchors {
                             left: albumArt.right
-                            leftMargin: 14
+                            leftMargin: 15
                             right: parent.right
                             rightMargin: 24
                             top: parent.top
-                            topMargin: 51
+                            topMargin: 53
                         }
-                        height: 57
+                        height: 67
 
                         Text {
                             id: musicTitleText
-                            anchors {
-                                left: parent.left
-                                right: parent.right
-                                top: parent.top
-                            }
+                            anchors { left: parent.left; right: parent.right; top: parent.top }
                             text: island.musicTitle
                             color: "#f5f5f7"
-                            font.pixelSize: 15
+                            font.pixelSize: 16
                             font.weight: Font.DemiBold
                             elide: Text.ElideRight
                             maximumLineCount: 1
@@ -719,7 +805,7 @@ ShellRoot {
                                 left: parent.left
                                 right: parent.right
                                 top: musicTitleText.bottom
-                                topMargin: 2
+                                topMargin: 3
                             }
                             text: island.musicArtist
                             color: "#8e8e93"
@@ -734,7 +820,7 @@ ShellRoot {
                                 left: parent.left
                                 right: parent.right
                                 bottom: parent.bottom
-                                bottomMargin: 3
+                                bottomMargin: 4
                             }
                             height: 4
                             radius: 2
@@ -745,6 +831,9 @@ ShellRoot {
                                 height: parent.height
                                 radius: parent.radius
                                 color: "#f2f2f7"
+                                Behavior on width {
+                                    NumberAnimation { duration: 180; easing.type: Easing.Linear }
+                                }
                             }
                         }
                     }
@@ -752,27 +841,38 @@ ShellRoot {
 
                 // ---------- CONNECTIVITY ----------
                 Item {
+                    id: connectivityMode
+                    property bool active: island.displayMode === "connectivity" && island.expanded
                     anchors.fill: parent
-                    visible: island.displayMode === "connectivity" && island.expanded
+                    opacity: active ? 1 : 0
+                    scale: active ? 1 : 0.985
+                    visible: opacity > 0.01
+                    enabled: active
+                    transformOrigin: Item.Top
+
+                    Behavior on opacity {
+                        NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+                    }
+                    Behavior on scale {
+                        NumberAnimation {
+                            duration: 185
+                            easing.type: Easing.OutBack
+                            easing.overshoot: 0.4
+                        }
+                    }
 
                     Item {
-                        anchors {
-                            left: parent.left
-                            top: parent.top
-                        }
+                        anchors { left: parent.left; top: parent.top }
                         width: island.wingWidth
                         height: island.normalHeight
 
                         Rectangle {
-                            anchors {
-                                left: parent.left
-                                leftMargin: 24
-                                verticalCenter: parent.verticalCenter
-                            }
+                            anchors { left: parent.left; leftMargin: 24; verticalCenter: parent.verticalCenter }
                             width: 7
                             height: 7
                             radius: 3.5
                             color: island.wifiEnabled ? "#30d158" : "#636366"
+                            Behavior on color { ColorAnimation { duration: 180 } }
                         }
 
                         Text {
@@ -801,23 +901,17 @@ ShellRoot {
                     }
 
                     Item {
-                        anchors {
-                            right: parent.right
-                            top: parent.top
-                        }
+                        anchors { right: parent.right; top: parent.top }
                         width: island.wingWidth
                         height: island.normalHeight
 
                         Rectangle {
-                            anchors {
-                                right: parent.right
-                                rightMargin: 24
-                                verticalCenter: parent.verticalCenter
-                            }
+                            anchors { right: parent.right; rightMargin: 24; verticalCenter: parent.verticalCenter }
                             width: 7
                             height: 7
                             radius: 3.5
                             color: island.bluetoothPowered ? "#30d158" : "#636366"
+                            Behavior on color { ColorAnimation { duration: 180 } }
                         }
 
                         Text {
@@ -849,16 +943,18 @@ ShellRoot {
 
                 // ---------- TEMPORARY VOLUME ----------
                 Item {
+                    id: volumeMode
+                    property bool active: island.displayMode === "volume" && island.expanded
                     anchors.fill: parent
-                    visible: island.displayMode === "volume" && island.expanded
+                    opacity: active ? 1 : 0
+                    scale: active ? 1 : 0.985
+                    visible: opacity > 0.01
+                    enabled: active
+                    Behavior on opacity { NumberAnimation { duration: 135; easing.type: Easing.OutCubic } }
+                    Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutBack; easing.overshoot: 0.35 } }
 
                     Text {
-                        anchors {
-                            left: parent.left
-                            leftMargin: 24
-                            top: parent.top
-                            topMargin: 15
-                        }
+                        anchors { left: parent.left; leftMargin: 24; top: parent.top; topMargin: 15 }
                         text: island.volumeMuted ? "Muted" : "Volume"
                         color: "white"
                         font.pixelSize: 15
@@ -866,31 +962,22 @@ ShellRoot {
                     }
 
                     Rectangle {
-                        anchors {
-                            horizontalCenter: parent.horizontalCenter
-                            top: parent.top
-                            topMargin: 22
-                        }
+                        anchors { horizontalCenter: parent.horizontalCenter; top: parent.top; topMargin: 22 }
                         width: 104
                         height: 4
                         radius: 2
                         color: "#343438"
-
                         Rectangle {
                             width: parent.width * (island.volumeMuted ? 0 : island.volumePercent / 100)
                             height: parent.height
                             radius: parent.radius
                             color: "#f2f2f7"
+                            Behavior on width { NumberAnimation { duration: 170; easing.type: Easing.OutCubic } }
                         }
                     }
 
                     Text {
-                        anchors {
-                            right: parent.right
-                            rightMargin: 24
-                            top: parent.top
-                            topMargin: 13
-                        }
+                        anchors { right: parent.right; rightMargin: 24; top: parent.top; topMargin: 13 }
                         text: island.volumeMuted ? "—" : island.volumePercent
                         color: "#e8e8ed"
                         font.pixelSize: 17
@@ -900,47 +987,40 @@ ShellRoot {
 
                 // ---------- TEMPORARY BRIGHTNESS ----------
                 Item {
+                    id: brightnessMode
+                    property bool active: island.displayMode === "brightness" && island.expanded
                     anchors.fill: parent
-                    visible: island.displayMode === "brightness" && island.expanded
+                    opacity: active ? 1 : 0
+                    scale: active ? 1 : 0.985
+                    visible: opacity > 0.01
+                    enabled: active
+                    Behavior on opacity { NumberAnimation { duration: 135; easing.type: Easing.OutCubic } }
+                    Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutBack; easing.overshoot: 0.35 } }
 
                     Text {
-                        anchors {
-                            left: parent.left
-                            leftMargin: 24
-                            top: parent.top
-                            topMargin: 13
-                        }
+                        anchors { left: parent.left; leftMargin: 24; top: parent.top; topMargin: 13 }
                         text: "☀"
                         color: "white"
                         font.pixelSize: 18
                     }
 
                     Rectangle {
-                        anchors {
-                            horizontalCenter: parent.horizontalCenter
-                            top: parent.top
-                            topMargin: 22
-                        }
+                        anchors { horizontalCenter: parent.horizontalCenter; top: parent.top; topMargin: 22 }
                         width: 112
                         height: 4
                         radius: 2
                         color: "#343438"
-
                         Rectangle {
                             width: parent.width * (island.brightnessPercent / 100)
                             height: parent.height
                             radius: parent.radius
                             color: "#f2f2f7"
+                            Behavior on width { NumberAnimation { duration: 170; easing.type: Easing.OutCubic } }
                         }
                     }
 
                     Text {
-                        anchors {
-                            right: parent.right
-                            rightMargin: 24
-                            top: parent.top
-                            topMargin: 13
-                        }
+                        anchors { right: parent.right; rightMargin: 24; top: parent.top; topMargin: 13 }
                         text: island.brightnessPercent
                         color: "#e8e8ed"
                         font.pixelSize: 17
@@ -950,16 +1030,17 @@ ShellRoot {
 
                 // ---------- TEMPORARY BATTERY ----------
                 Item {
+                    id: batteryMode
+                    property bool active: island.displayMode === "battery" && island.expanded
                     anchors.fill: parent
-                    visible: island.displayMode === "battery" && island.expanded
+                    opacity: active ? 1 : 0
+                    scale: active ? 1 : 0.985
+                    visible: opacity > 0.01
+                    Behavior on opacity { NumberAnimation { duration: 135; easing.type: Easing.OutCubic } }
+                    Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutBack; easing.overshoot: 0.35 } }
 
                     Text {
-                        anchors {
-                            left: parent.left
-                            leftMargin: 24
-                            top: parent.top
-                            topMargin: 14
-                        }
+                        anchors { left: parent.left; leftMargin: 24; top: parent.top; topMargin: 14 }
                         text: island.batteryEventText
                         color: island.batteryCharging ? "#30d158" : "#e8e8ed"
                         font.pixelSize: 16
@@ -967,12 +1048,7 @@ ShellRoot {
                     }
 
                     Text {
-                        anchors {
-                            right: parent.right
-                            rightMargin: 24
-                            top: parent.top
-                            topMargin: 13
-                        }
+                        anchors { right: parent.right; rightMargin: 24; top: parent.top; topMargin: 13 }
                         text: Math.round(island.batteryLevel * 100) + "%"
                         color: island.batteryColor
                         font.pixelSize: 17
@@ -982,16 +1058,17 @@ ShellRoot {
 
                 // ---------- TEMPORARY BLUETOOTH ----------
                 Item {
+                    id: bluetoothMode
+                    property bool active: island.displayMode === "bluetooth" && island.expanded
                     anchors.fill: parent
-                    visible: island.displayMode === "bluetooth" && island.expanded
+                    opacity: active ? 1 : 0
+                    scale: active ? 1 : 0.985
+                    visible: opacity > 0.01
+                    Behavior on opacity { NumberAnimation { duration: 135; easing.type: Easing.OutCubic } }
+                    Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutBack; easing.overshoot: 0.35 } }
 
                     Text {
-                        anchors {
-                            left: parent.left
-                            leftMargin: 24
-                            top: parent.top
-                            topMargin: 15
-                        }
+                        anchors { left: parent.left; leftMargin: 24; top: parent.top; topMargin: 15 }
                         text: "Bluetooth"
                         color: "#e8e8ed"
                         font.pixelSize: 15
@@ -999,12 +1076,7 @@ ShellRoot {
                     }
 
                     Text {
-                        anchors {
-                            right: parent.right
-                            rightMargin: 24
-                            top: parent.top
-                            topMargin: 15
-                        }
+                        anchors { right: parent.right; rightMargin: 24; top: parent.top; topMargin: 15 }
                         width: island.wingWidth - 30
                         text: island.bluetoothEventText
                         color: "white"
@@ -1016,18 +1088,21 @@ ShellRoot {
                 }
             }
 
+            // Soft spring-like horizontal motion. Music is intentionally faster
+            // because its larger card would otherwise feel heavy.
             Behavior on width {
                 NumberAnimation {
-                    duration: 220
+                    duration: island.largeMotion ? 185 : 285
                     easing.type: Easing.OutBack
-                    easing.overshoot: 1.12
+                    easing.overshoot: island.largeMotion ? 0.42 : 0.72
                 }
             }
 
             Behavior on height {
                 NumberAnimation {
-                    duration: 220
-                    easing.type: Easing.OutCubic
+                    duration: island.largeMotion ? 175 : 265
+                    easing.type: island.largeMotion ? Easing.OutCubic : Easing.OutBack
+                    easing.overshoot: 0.38
                 }
             }
         }
