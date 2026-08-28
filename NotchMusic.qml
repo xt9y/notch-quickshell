@@ -49,7 +49,7 @@ Item {
         anchors.horizontalCenter: albumArt.horizontalCenter
         anchors.top: parent.top
         anchors.topMargin: 11
-        spacing: 9
+        spacing: 4
 
         Item {
             width: 22
@@ -73,7 +73,7 @@ Item {
             height: 28
             Text {
                 anchors.centerIn: parent
-                anchors.verticalCenterOffset: 2
+                anchors.verticalCenterOffset: -2
                 text: root.playing ? "||" : ">"
                 color: root.player && root.player.canTogglePlaying ? "white" : "#55555a"
                 font.pixelSize: root.playing ? 12 : 14
