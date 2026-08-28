@@ -24,6 +24,19 @@ Item {
     visible: active
     enabled: active
 
+    function openCalendar() {
+        // This overlay lives directly inside designSurface, whose parent is the island
+        // controller. Keep Calendar out of Settings while restoring the original
+        // right-side date action.
+        var island = root.parent && root.parent.parent ? root.parent.parent : null
+        if (island && island.selectedMode !== undefined) {
+            island.transientMode = ""
+            island.selectedMode = "calendarPanel"
+            return
+        }
+        root.calendarRequested()
+    }
+
     Item {
         anchors.left: parent.left
         anchors.top: parent.top
@@ -128,7 +141,7 @@ Item {
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: root.calendarRequested()
+            onClicked: root.openCalendar()
         }
     }
 }
