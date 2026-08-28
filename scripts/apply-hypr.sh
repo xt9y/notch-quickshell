@@ -3,36 +3,57 @@ set -euo pipefail
 
 repo_root="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 source_config="$repo_root/hypr/hyprland.lua"
+source_kitty="$repo_root/kitty/kitty.conf"
 alias_file="$repo_root/shell/notch-aliases.sh"
 config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+
 hypr_dir="$config_home/hypr"
 target_config="$hypr_dir/hyprland.lua"
 backup_config="$hypr_dir/hyprland.lua.notch-backup"
+
+kitty_dir="$config_home/kitty"
+target_kitty="$kitty_dir/kitty.conf"
+backup_kitty="$kitty_dir/kitty.conf.notch-backup"
 
 if [[ ! -f "$source_config" ]]; then
     echo "notch-quickshell: missing $source_config" >&2
     exit 1
 fi
 
-mkdir -p "$hypr_dir"
+link_managed_file() {
+    local source_file="$1"
+    local target_file="$2"
+    local backup_file="$3"
+    local label="$4"
 
-desired_target="$(readlink -f "$source_config")"
-current_target=""
-if [[ -L "$target_config" ]]; then
-    current_target="$(readlink -f "$target_config" 2>/dev/null || true)"
-fi
+    mkdir -p "$(dirname "$target_file")"
 
-if [[ "$current_target" != "$desired_target" ]]; then
-    if [[ -e "$target_config" || -L "$target_config" ]]; then
-        if [[ ! -e "$backup_config" && ! -L "$backup_config" ]]; then
-            cp -aL "$target_config" "$backup_config"
-            echo "notch-quickshell: backed up existing Hyprland config to $backup_config"
-        fi
-        rm -f "$target_config"
+    local desired_target
+    desired_target="$(readlink -f "$source_file")"
+
+    local current_target=""
+    if [[ -L "$target_file" ]]; then
+        current_target="$(readlink -f "$target_file" 2>/dev/null || true)"
     fi
 
-    ln -s "$source_config" "$target_config"
-    echo "notch-quickshell: Hyprland config now points to $source_config"
+    if [[ "$current_target" != "$desired_target" ]]; then
+        if [[ -e "$target_file" || -L "$target_file" ]]; then
+            if [[ ! -e "$backup_file" && ! -L "$backup_file" ]]; then
+                cp -aL "$target_file" "$backup_file"
+                echo "notch-quickshell: backed up existing $label to $backup_file"
+            fi
+            rm -f "$target_file"
+        fi
+
+        ln -s "$source_file" "$target_file"
+        echo "notch-quickshell: $label now points to $source_file"
+    fi
+}
+
+link_managed_file "$source_config" "$target_config" "$backup_config" "Hyprland config"
+
+if [[ -f "$source_kitty" ]]; then
+    link_managed_file "$source_kitty" "$target_kitty" "$backup_kitty" "Kitty config"
 fi
 
 # Keep shell helpers in the repo as well. The rc file only contains one stable
