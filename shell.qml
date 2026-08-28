@@ -163,10 +163,10 @@ ShellRoot {
                     return 530
                 if (mode === "wifiPanel" || mode === "bluetoothPanel")
                     return 540
-                // 330 gives ~80 px on each side of the 170 px hardware notch,
-                // roughly half the previous wing width.
+                // Slightly roomier than the ultra-tight 330 px version while
+                // still hugging the hardware notch closely.
                 if (mode === "volume" || mode === "brightness")
-                    return 330
+                    return 370
                 if (mode === "battery")
                     return 420
                 return 540
@@ -562,7 +562,7 @@ ShellRoot {
             }
 
             Timer {
-                interval: island.displayMode === "volume" ? 45 : 120
+                interval: island.displayMode === "volume" ? 45 : 90
                 repeat: true
                 running: true
                 triggeredOnStart: true
@@ -577,6 +577,28 @@ ShellRoot {
                 command: ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"]
                 stdout: StdioCollector {
                     onStreamFinished: island.consumeVolume(text)
+                }
+            }
+
+            // setup.sh's managed Volume Up/Down launchers update this file for
+            // every key-repeat event. This makes the popup event-driven instead
+            // of relying solely on polling and also restarts its timeout while
+            // the user is holding a volume key.
+            FileView {
+                id: volumeEventWatcher
+                path: {
+                    var base = Quickshell.env("XDG_CACHE_HOME")
+                    if (!base || base === "")
+                        base = (Quickshell.env("HOME") || "") + "/.cache"
+                    return base + "/notch-quickshell/volume-event"
+                }
+                watchChanges: true
+
+                onFileChanged: {
+                    reload()
+                    island.showTransient("volume", 1850)
+                    if (!volumeProbe.running)
+                        volumeProbe.running = true
                 }
             }
 
