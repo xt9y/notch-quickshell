@@ -44,23 +44,6 @@ Item {
     signal detailBackRequested()
     signal statusRefreshRequested()
 
-    Text {
-        anchors.left: parent.left
-        anchors.leftMargin: 19
-        anchors.top: parent.top
-        anchors.topMargin: 15
-        opacity: root.musicPlaying && !root.expanded ? 1 : 0
-        visible: opacity > 0.01
-        text: "♪"
-        color: "#c7c7cc"
-        font.pixelSize: 13
-        font.weight: Font.Medium
-
-        Behavior on opacity {
-            NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
-        }
-    }
-
     // ---------- NORMAL ----------
     Item {
         property bool active: root.displayMode === "normal" && root.expanded
@@ -150,15 +133,21 @@ Item {
             }
         }
 
-        Text {
+        Item {
             anchors.right: parent.right
-            anchors.rightMargin: 24
             anchors.top: parent.top
-            anchors.topMargin: 13
-            text: Qt.formatDateTime(root.now, "ddd, d MMM")
-            color: "#b8b8bd"
-            font.pixelSize: 17
-            font.weight: Font.Medium
+            width: root.rightWingWidth
+            height: root.normalHeight
+
+            Text {
+                anchors.right: parent.right
+                anchors.rightMargin: 24
+                anchors.verticalCenter: parent.verticalCenter
+                text: Qt.formatDateTime(root.now, "ddd, d MMM")
+                color: "#b8b8bd"
+                font.pixelSize: 17
+                font.weight: Font.Medium
+            }
         }
     }
 
@@ -289,6 +278,7 @@ Item {
         opacity: active ? 1 : 0
         scale: active ? 1 : 0.985
         visible: opacity > 0.01
+        transformOrigin: Item.Top
 
         Behavior on opacity {
             NumberAnimation { duration: 105; easing.type: Easing.OutCubic }
@@ -301,43 +291,61 @@ Item {
             }
         }
 
-        Text {
+        Item {
             anchors.left: parent.left
-            anchors.leftMargin: 24
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.volumeMuted ? "Muted" : "Volume"
-            color: "white"
-            font.pixelSize: 15
-            font.weight: Font.Medium
-        }
+            anchors.top: parent.top
+            width: root.leftWingWidth
+            height: root.normalHeight
 
-        Rectangle {
-            anchors.centerIn: parent
-            width: 104
-            height: 4
-            radius: 2
-            color: "#343438"
+            Text {
+                id: volumeLabel
+                anchors.left: parent.left
+                anchors.leftMargin: 24
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.volumeMuted ? "Muted" : "Volume"
+                color: "white"
+                font.pixelSize: 15
+                font.weight: Font.Medium
+            }
 
             Rectangle {
-                width: parent.width * (root.volumeMuted ? 0 : root.volumePercent / 100)
-                height: parent.height
-                radius: parent.radius
-                color: "#f2f2f7"
+                anchors.left: volumeLabel.right
+                anchors.leftMargin: 12
+                anchors.right: parent.right
+                anchors.rightMargin: 16
+                anchors.verticalCenter: parent.verticalCenter
+                height: 4
+                radius: 2
+                color: "#343438"
 
-                Behavior on width {
-                    NumberAnimation { duration: 55; easing.type: Easing.OutCubic }
+                Rectangle {
+                    width: parent.width * (root.volumeMuted ? 0 : root.volumePercent / 100)
+                    height: parent.height
+                    radius: parent.radius
+                    color: "#f2f2f7"
+
+                    Behavior on width {
+                        NumberAnimation { duration: 55; easing.type: Easing.OutCubic }
+                    }
                 }
             }
         }
 
-        Text {
+        Item {
             anchors.right: parent.right
-            anchors.rightMargin: 24
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.volumeMuted ? "—" : root.volumePercent
-            color: "#e8e8ed"
-            font.pixelSize: 17
-            font.weight: Font.Medium
+            anchors.top: parent.top
+            width: root.rightWingWidth
+            height: root.normalHeight
+
+            Text {
+                anchors.right: parent.right
+                anchors.rightMargin: 24
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.volumeMuted ? "—" : root.volumePercent
+                color: "#e8e8ed"
+                font.pixelSize: 17
+                font.weight: Font.Medium
+            }
         }
     }
 
@@ -348,6 +356,7 @@ Item {
         opacity: active ? 1 : 0
         scale: active ? 1 : 0.985
         visible: opacity > 0.01
+        transformOrigin: Item.Top
 
         Behavior on opacity {
             NumberAnimation { duration: 105; easing.type: Easing.OutCubic }
@@ -360,42 +369,60 @@ Item {
             }
         }
 
-        Text {
+        Item {
             anchors.left: parent.left
-            anchors.leftMargin: 24
-            anchors.verticalCenter: parent.verticalCenter
-            text: "☀"
-            color: "white"
-            font.pixelSize: 18
-        }
+            anchors.top: parent.top
+            width: root.leftWingWidth
+            height: root.normalHeight
 
-        Rectangle {
-            anchors.centerIn: parent
-            width: 112
-            height: 4
-            radius: 2
-            color: "#343438"
+            Text {
+                id: brightnessLabel
+                anchors.left: parent.left
+                anchors.leftMargin: 24
+                anchors.verticalCenter: parent.verticalCenter
+                text: "☀"
+                color: "white"
+                font.pixelSize: 18
+            }
 
             Rectangle {
-                width: parent.width * (root.brightnessPercent / 100)
-                height: parent.height
-                radius: parent.radius
-                color: "#f2f2f7"
+                anchors.left: brightnessLabel.right
+                anchors.leftMargin: 13
+                anchors.right: parent.right
+                anchors.rightMargin: 16
+                anchors.verticalCenter: parent.verticalCenter
+                height: 4
+                radius: 2
+                color: "#343438"
 
-                Behavior on width {
-                    NumberAnimation { duration: 60; easing.type: Easing.OutCubic }
+                Rectangle {
+                    width: parent.width * (root.brightnessPercent / 100)
+                    height: parent.height
+                    radius: parent.radius
+                    color: "#f2f2f7"
+
+                    Behavior on width {
+                        NumberAnimation { duration: 60; easing.type: Easing.OutCubic }
+                    }
                 }
             }
         }
 
-        Text {
+        Item {
             anchors.right: parent.right
-            anchors.rightMargin: 24
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.brightnessPercent
-            color: "#e8e8ed"
-            font.pixelSize: 17
-            font.weight: Font.Medium
+            anchors.top: parent.top
+            width: root.rightWingWidth
+            height: root.normalHeight
+
+            Text {
+                anchors.right: parent.right
+                anchors.rightMargin: 24
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.brightnessPercent
+                color: "#e8e8ed"
+                font.pixelSize: 17
+                font.weight: Font.Medium
+            }
         }
     }
 
@@ -418,26 +445,40 @@ Item {
             }
         }
 
-        Text {
+        Item {
             anchors.left: parent.left
-            anchors.leftMargin: 24
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.batteryEventText
-            color: root.batteryCharging
-                ? "#30d158"
-                : root.batteryLevel <= 0.20 ? "#ff453a" : "#e8e8ed"
-            font.pixelSize: 16
-            font.weight: Font.Medium
+            anchors.top: parent.top
+            width: root.leftWingWidth
+            height: root.normalHeight
+
+            Text {
+                anchors.left: parent.left
+                anchors.leftMargin: 24
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.batteryEventText
+                color: root.batteryCharging
+                    ? "#30d158"
+                    : root.batteryLevel <= 0.20 ? "#ff453a" : "#e8e8ed"
+                font.pixelSize: 16
+                font.weight: Font.Medium
+            }
         }
 
-        Text {
+        Item {
             anchors.right: parent.right
-            anchors.rightMargin: 24
-            anchors.verticalCenter: parent.verticalCenter
-            text: Math.round(root.batteryLevel * 100) + "%"
-            color: root.batteryColor
-            font.pixelSize: 17
-            font.weight: Font.Medium
+            anchors.top: parent.top
+            width: root.rightWingWidth
+            height: root.normalHeight
+
+            Text {
+                anchors.right: parent.right
+                anchors.rightMargin: 24
+                anchors.verticalCenter: parent.verticalCenter
+                text: Math.round(root.batteryLevel * 100) + "%"
+                color: root.batteryColor
+                font.pixelSize: 17
+                font.weight: Font.Medium
+            }
         }
     }
 
@@ -461,28 +502,42 @@ Item {
             }
         }
 
-        Text {
+        Item {
             anchors.left: parent.left
-            anchors.leftMargin: 24
             anchors.top: parent.top
-            anchors.topMargin: 15
-            text: "Bluetooth"
-            color: "#b8b8bd"
-            font.pixelSize: 14
-            font.weight: Font.Medium
+            width: root.leftWingWidth
+            height: root.normalHeight
+
+            Text {
+                anchors.left: parent.left
+                anchors.leftMargin: 24
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Bluetooth"
+                color: "#b8b8bd"
+                font.pixelSize: 14
+                font.weight: Font.Medium
+            }
         }
 
-        Rectangle {
+        Item {
             anchors.right: parent.right
-            anchors.rightMargin: 24
             anchors.top: parent.top
-            anchors.topMargin: 20
-            width: 7
-            height: 7
-            radius: 3.5
-            color: root.bluetoothPowered ? "#30d158" : "#636366"
+            width: root.rightWingWidth
+            height: root.normalHeight
+
+            Rectangle {
+                anchors.right: parent.right
+                anchors.rightMargin: 24
+                anchors.verticalCenter: parent.verticalCenter
+                width: 7
+                height: 7
+                radius: 3.5
+                color: root.bluetoothPowered ? "#30d158" : "#636366"
+            }
         }
 
+        // The second row is below the hardware notch, so the full device name
+        // can use the whole popup width without being hidden by the camera cutout.
         Text {
             anchors.left: parent.left
             anchors.leftMargin: 24
