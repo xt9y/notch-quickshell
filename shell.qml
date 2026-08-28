@@ -46,7 +46,6 @@ ShellRoot {
             property string displayMode: transientMode !== "" ? transientMode : selectedMode
 
             // Keep an expanded notch alive briefly after the pointer leaves.
-            // This removes the abrupt snap while still collapsing quickly.
             property bool hoverHold: false
             property bool expanded: hover.hovered || hoverHold || transientMode !== ""
 
@@ -62,13 +61,19 @@ ShellRoot {
                 (battery.state === UPowerDeviceState.FullyCharged || batteryLevel >= 0.95)
             property color batteryColor: batteryCharging || batteryFull
                 ? "#30d158"
-                : batteryLevel <= 0.15
+                : batteryLevel <= 0.20
                     ? "#ff453a"
                     : batteryLevel <= 0.30
                         ? "#ffd60a"
                         : "#f2f2f7"
+            property color batteryShellColor: !batteryCharging && batteryLevel <= 0.20
+                ? "#ff453a"
+                : "#d1d1d6"
             property int lastBatteryState: -1
+            property int lastBatteryPercent: -1
             property string batteryEventText: "Battery"
+            property bool batteryCriticalPopup:
+                transientMode === "battery" && batteryLevel <= 0.20
 
             // Media is exposed only while something is actually playing.
             property var activePlayer: {
@@ -100,6 +105,15 @@ ShellRoot {
             property real musicProgress: musicLength > 0
                 ? Math.max(0, Math.min(1, musicPosition / musicLength))
                 : 0
+
+            // A change to any important track identity field counts as a new
+            // song event. MPRIS players often update these fields separately,
+            // so repeated changes simply restart the same short popup timer.
+            property string musicEventKey: musicPlaying
+                ? musicTitle + "\u241f" + musicArtist + "\u241f" + musicArtRaw
+                : ""
+            property string lastMusicEventKey: ""
+            property bool musicEventInitialized: false
 
             // Read-only volume and brightness observation.
             property int volumePercent: 0
@@ -160,8 +174,38 @@ ShellRoot {
             height: targetHeight
 
             onMusicPlayingChanged: {
-                if (!musicPlaying && selectedMode === "music")
-                    selectedMode = "normal"
+                if (musicPlaying) {
+                    musicEventInitialized = true
+                    lastMusicEventKey = musicEventKey
+                    refreshArtwork()
+                    showTransient("music", 2600)
+                } else {
+                    musicEventInitialized = false
+                    lastMusicEventKey = ""
+                    if (selectedMode === "music")
+                        selectedMode = "normal"
+                    if (transientMode === "music") {
+                        transientTimer.stop()
+                        transientMode = ""
+                    }
+                }
+            }
+
+            onMusicEventKeyChanged: {
+                if (!musicPlaying || musicEventKey === "")
+                    return
+
+                if (!musicEventInitialized) {
+                    musicEventInitialized = true
+                    lastMusicEventKey = musicEventKey
+                    showTransient("music", 2600)
+                    return
+                }
+
+                if (musicEventKey !== lastMusicEventKey) {
+                    lastMusicEventKey = musicEventKey
+                    showTransient("music", 2600)
+                }
             }
 
             onMusicArtRawChanged: refreshArtwork()
@@ -175,9 +219,8 @@ ShellRoot {
                 if (raw.indexOf("http://") !== 0 && raw.indexOf("https://") !== 0)
                     return
 
-                // Image tries the remote URL immediately. This background cache
-                // is a fallback for players/Qt builds that fail to render remote
-                // MPRIS artwork directly.
+                // Image tries the remote URL immediately. This cache is a
+                // fallback for Qt/player combinations that reject remote art.
                 artFetch.command = [
                     "bash", "-lc",
                     "set -e; url=\"$1\"; command -v curl >/dev/null 2>&1 || exit 0; dir=\"${XDG_CACHE_HOME:-$HOME/.cache}/notch-quickshell/art\"; mkdir -p \"$dir\"; key=$(printf '%s' \"$url\" | sha256sum | cut -d' ' -f1); out=\"$dir/$key\"; if [ ! -s \"$out\" ]; then tmp=\"$out.tmp.$$\"; curl -LfsS --max-time 8 \"$url\" -o \"$tmp\" && mv \"$tmp\" \"$out\" || { rm -f \"$tmp\"; exit 0; }; fi; [ -s \"$out\" ] && printf 'file://%s' \"$out\"",
@@ -187,8 +230,9 @@ ShellRoot {
                 artFetch.running = true
             }
 
-            function showTransient(mode) {
+            function showTransient(mode, duration) {
                 transientMode = mode
+                transientTimer.interval = duration || 1850
                 transientTimer.restart()
             }
 
@@ -234,7 +278,7 @@ ShellRoot {
                 if (percent !== lastVolumePercent || muted !== lastVolumeMuted) {
                     lastVolumePercent = percent
                     lastVolumeMuted = muted
-                    showTransient("volume")
+                    showTransient("volume", 1850)
                 }
             }
 
@@ -253,7 +297,7 @@ ShellRoot {
 
                 if (percent !== lastBrightnessPercent) {
                     lastBrightnessPercent = percent
-                    showTransient("brightness")
+                    showTransient("brightness", 1850)
                 }
             }
 
@@ -293,18 +337,44 @@ ShellRoot {
                 if (bluetoothDevice !== lastBluetoothDevice) {
                     if (bluetoothDevice !== "") {
                         bluetoothEventText = bluetoothDevice
-                        showTransient("bluetooth")
+                        showTransient("bluetooth", 1850)
                     } else if (lastBluetoothDevice !== "") {
                         bluetoothEventText = lastBluetoothDevice + " disconnected"
-                        showTransient("bluetooth")
+                        showTransient("bluetooth", 1850)
                     }
                     lastBluetoothDevice = bluetoothDevice
                 }
             }
 
+            function crossedBatteryThreshold(previous, current) {
+                var thresholds = [80, 50, 20, 10, 5, 2]
+                for (var i = 0; i < thresholds.length; ++i) {
+                    var threshold = thresholds[i]
+                    if (previous > threshold && current <= threshold)
+                        return threshold
+                }
+                return -1
+            }
+
             function checkBatteryState() {
                 if (!battery || !battery.ready)
                     return
+
+                var percent = Math.round(batteryLevel * 100)
+                if (lastBatteryPercent < 0) {
+                    lastBatteryPercent = percent
+                } else {
+                    // Milestones are downward/discharging alerts. This avoids
+                    // replaying every warning while the laptop is charging up.
+                    if (!batteryCharging && percent < lastBatteryPercent) {
+                        var threshold = crossedBatteryThreshold(lastBatteryPercent, percent)
+                        if (threshold >= 0) {
+                            batteryEventText = threshold <= 20 ? "Low Battery" : "Battery"
+                            showTransient("battery", 2200)
+                        }
+                    }
+                    lastBatteryPercent = percent
+                }
 
                 var state = battery.state
                 if (lastBatteryState < 0) {
@@ -321,10 +391,10 @@ ShellRoot {
 
                 if (isCharging && !wasCharging) {
                     batteryEventText = "Charging"
-                    showTransient("battery")
+                    showTransient("battery", 1850)
                 } else if (!isCharging && wasCharging) {
                     batteryEventText = "On Battery"
-                    showTransient("battery")
+                    showTransient("battery", 1850)
                 }
 
                 lastBatteryState = state
@@ -515,6 +585,50 @@ ShellRoot {
                 }
             }
 
+            // Subtle warning perimeter exists only while a <=20% battery popup
+            // is actually on screen. It disappears with the transient itself.
+            Shape {
+                id: lowBatteryOutline
+                anchors.fill: parent
+                antialiasing: true
+                opacity: island.batteryCriticalPopup && island.expanded ? 1 : 0
+                visible: opacity > 0.01
+
+                Behavior on opacity {
+                    NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+                }
+
+                ShapePath {
+                    strokeWidth: 1.25
+                    strokeColor: "#80ff453a"
+                    fillColor: "transparent"
+                    startX: 1
+                    startY: 1
+                    PathLine { x: lowBatteryOutline.width - 1; y: 1 }
+                    PathLine {
+                        x: lowBatteryOutline.width - 1
+                        y: lowBatteryOutline.height - island.cornerRadius
+                    }
+                    PathQuad {
+                        x: lowBatteryOutline.width - island.cornerRadius
+                        y: lowBatteryOutline.height - 1
+                        controlX: lowBatteryOutline.width - 1
+                        controlY: lowBatteryOutline.height - 1
+                    }
+                    PathLine {
+                        x: island.cornerRadius
+                        y: lowBatteryOutline.height - 1
+                    }
+                    PathQuad {
+                        x: 1
+                        y: lowBatteryOutline.height - island.cornerRadius
+                        controlX: 1
+                        controlY: lowBatteryOutline.height - 1
+                    }
+                    PathLine { x: 1; y: 1 }
+                }
+            }
+
             Item {
                 id: content
                 anchors.fill: parent
@@ -596,7 +710,11 @@ ShellRoot {
                                 radius: 3.5
                                 color: "transparent"
                                 border.width: 1
-                                border.color: "#d1d1d6"
+                                border.color: island.batteryShellColor
+
+                                Behavior on border.color {
+                                    ColorAnimation { duration: 180 }
+                                }
 
                                 Rectangle {
                                     anchors {
@@ -628,7 +746,8 @@ ShellRoot {
                                 width: 3
                                 height: 7
                                 radius: 1.5
-                                color: "#d1d1d6"
+                                color: island.batteryShellColor
+                                Behavior on color { ColorAnimation { duration: 180 } }
                             }
                         }
                     }
@@ -1042,9 +1161,11 @@ ShellRoot {
                     Text {
                         anchors { left: parent.left; leftMargin: 24; top: parent.top; topMargin: 14 }
                         text: island.batteryEventText
-                        color: island.batteryCharging ? "#30d158" : "#e8e8ed"
+                        color: island.batteryCharging ? "#30d158" :
+                               island.batteryLevel <= 0.20 ? "#ff453a" : "#e8e8ed"
                         font.pixelSize: 16
                         font.weight: Font.Medium
+                        Behavior on color { ColorAnimation { duration: 160 } }
                     }
 
                     Text {
@@ -1053,6 +1174,7 @@ ShellRoot {
                         color: island.batteryColor
                         font.pixelSize: 17
                         font.weight: Font.Medium
+                        Behavior on color { ColorAnimation { duration: 160 } }
                     }
                 }
 
