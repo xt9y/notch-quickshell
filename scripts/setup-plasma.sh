@@ -5,7 +5,6 @@ repo_root="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
 
 source_kitty="$repo_root/kitty/kitty.conf"
-alias_file="$repo_root/shell/notch-aliases.sh"
 autostart_template="$repo_root/plasma/notch-quickshell.desktop.in"
 
 kitty_dir="$config_home/kitty"
@@ -50,30 +49,22 @@ if [[ -f "$source_kitty" ]]; then
     link_managed_file "$source_kitty" "$target_kitty" "$backup_kitty" "Kitty config"
 fi
 
-# Install config-update in the user's interactive shell. The rc file only gets
-# one stable source line; the alias itself stays in this repository.
-if [[ -f "$alias_file" ]]; then
-    shell_name="$(basename "${SHELL:-bash}")"
-    case "$shell_name" in
-        zsh) rc_file="$HOME/.zshrc" ;;
-        *)   rc_file="$HOME/.bashrc" ;;
-    esac
-
-    touch "$rc_file"
-    source_line='[[ -f "$HOME/.config/quickshell/notch/shell/notch-aliases.sh" ]] && source "$HOME/.config/quickshell/notch/shell/notch-aliases.sh"'
-
-    if ! grep -Fqx "$source_line" "$rc_file"; then
-        printf '\n# notch-quickshell helpers\n%s\n' "$source_line" >> "$rc_file"
-        echo "notch-quickshell: installed config-update alias in $rc_file"
+# Remove the legacy config-update shell integration completely. Older versions
+# sourced shell/notch-aliases.sh from the user's shell rc file.
+for rc_file in "$HOME/.bashrc" "$HOME/.zshrc"; do
+    if [[ -f "$rc_file" ]]; then
+        sed -i \
+            -e '\|^# notch-quickshell helpers$|d' \
+            -e '\|notch-aliases\.sh|d' \
+            -e '\|alias config-update=.*scripts/config-update\.sh|d' \
+            "$rc_file"
     fi
-fi
+done
 
-# Plasma autostart runs the exact same update path as the config-update alias.
+# Plasma starts Quickshell directly. There is no updater command or wrapper in
+# the login path anymore.
 if [[ -f "$autostart_template" ]]; then
     mkdir -p "$autostart_dir"
-    escaped_home="${HOME//\\/\\\\}"
-    escaped_home="${escaped_home//&/\\&}"
-    escaped_home="${escaped_home//|/\\|}"
-    sed "s|__HOME__|$escaped_home|g" "$autostart_template" > "$target_autostart"
+    cp "$autostart_template" "$target_autostart"
     chmod 0644 "$target_autostart"
 fi
