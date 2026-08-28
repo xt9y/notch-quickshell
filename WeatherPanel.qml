@@ -79,6 +79,31 @@ Item {
         return parts.length > 1 ? parts[1] : text
     }
 
+    function focusApiKeyInput() {
+        if (!root.active || !root.service || !root.service.keyLoaded || root.service.apiKey !== "")
+            return
+        Qt.callLater(function() {
+            keyInput.forceActiveFocus()
+        })
+    }
+
+    onActiveChanged: {
+        if (active)
+            root.focusApiKeyInput()
+    }
+
+    Connections {
+        target: root.service
+
+        function onKeyLoadedChanged() {
+            root.focusApiKeyInput()
+        }
+
+        function onApiKeyChanged() {
+            root.focusApiKeyInput()
+        }
+    }
+
     Item {
         id: header
         anchors.left: parent.left
@@ -162,7 +187,7 @@ Item {
             anchors.right: parent.right
             anchors.rightMargin: 24
             anchors.top: parent.top
-            anchors.topMargin: 32
+            anchors.topMargin: 20
             text: "WeatherAPI.com"
             color: "#f5f5f7"
             font.pixelSize: 20
@@ -175,7 +200,7 @@ Item {
             anchors.right: parent.right
             anchors.rightMargin: 24
             anchors.top: parent.top
-            anchors.topMargin: 66
+            anchors.topMargin: 52
             text: "Paste your API key once. It is saved only on this computer. Your weather location is resolved automatically by the API."
             color: "#8e8e93"
             font.pixelSize: 12
@@ -190,7 +215,7 @@ Item {
             anchors.leftMargin: 24
             anchors.rightMargin: 24
             anchors.top: parent.top
-            anchors.topMargin: 124
+            anchors.topMargin: 108
             height: 38
             radius: 10
             color: "#161618"
@@ -211,15 +236,20 @@ Item {
                 id: keyInput
                 anchors.left: parent.left
                 anchors.right: saveKey.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
                 anchors.leftMargin: 12
                 anchors.rightMargin: 10
-                anchors.verticalCenter: parent.verticalCenter
+                verticalAlignment: TextInput.AlignVCenter
                 color: "#f5f5f7"
                 font.pixelSize: 13
                 echoMode: TextInput.Password
                 passwordCharacter: "*"
                 selectionColor: "#48484a"
                 selectedTextColor: "white"
+                selectByMouse: true
+                activeFocusOnTab: true
+                focus: root.active && root.service && root.service.keyLoaded && root.service.apiKey === ""
                 clip: true
 
                 Keys.onReturnPressed: {
@@ -263,7 +293,7 @@ Item {
             anchors.left: parent.left
             anchors.leftMargin: 24
             anchors.top: keyField.bottom
-            anchors.topMargin: 12
+            anchors.topMargin: 10
             text: "The key file is stored with user-only permissions."
             color: "#48484a"
             font.pixelSize: 10
