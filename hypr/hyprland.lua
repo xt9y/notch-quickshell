@@ -175,3 +175,17 @@ hl.window_rule({
     match = { class = ".*" },
     suppress_event = "maximize",
 })
+
+-- XWayland Video Bridge is a KDE screen-sharing helper. Hyprland cannot use
+-- KDE's normal hiding mechanism for its dummy window, so hide it explicitly
+-- while keeping the bridge process available for XWayland screen sharing.
+hl.window_rule({
+    name = "xwayland-video-bridge-fixes",
+    match = { class = "xwaylandvideobridge" },
+    no_initial_focus = true,
+    no_focus = true,
+    no_anim = true,
+    no_blur = true,
+    max_size = { 1, 1 },
+    opacity = "0.0 override",
+})
