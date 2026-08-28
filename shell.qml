@@ -160,7 +160,7 @@ ShellRoot {
 
             function modeWidth(mode) {
                 if (mode === "music")
-                    return 530
+                    return 570
                 if (mode === "wifiPanel" || mode === "bluetoothPanel")
                     return 540
                 // Slightly roomier than the ultra-tight 330 px version while
