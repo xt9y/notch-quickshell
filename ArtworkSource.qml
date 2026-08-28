@@ -16,6 +16,10 @@ Item {
     height: 0
     visible: false
 
+    // This component is instantiated for the lifetime of the notch, so it is
+    // also a stable home for the non-visual PipeWire/Bluetooth handoff watcher.
+    AudioRecovery { }
+
     onRequestKeyChanged: Qt.callLater(root.refresh)
     Component.onCompleted: Qt.callLater(root.refresh)
 
@@ -32,9 +36,6 @@ Item {
             return
         }
 
-        // HTTP artwork can be displayed immediately while a stable local copy
-        // is produced in the background. Local MPRIS files are copied first so
-        // QML never races a temporary/deleted file path.
         if (raw.indexOf("http://") === 0 || raw.indexOf("https://") === 0)
             resolvedSource = raw
         else
