@@ -45,19 +45,13 @@ Item {
         connectedAddress = address
         connectedName = name
 
-        // Turning Bluetooth back on is an explicit request to make paired
-        // devices usable again, so do not retain an old reconnect cooldown.
         if (!wasPowered && powered)
             reconnectBlockedUntil = 0
 
         if (connected) {
-            // Route whenever a Bluetooth audio device appears or changes.
             if (!wasConnected || address !== oldAddress)
                 routeTimer.restart()
         } else if (wasConnected) {
-            // Give a deliberate/manual disconnect time to settle instead of
-            // immediately fighting it with the auto-connect loop. BlueZ can
-            // still accept a device-initiated reconnect during this window.
             reconnectBlockedUntil = Date.now() + 30000
             fallbackTimer.restart()
         }
@@ -96,9 +90,6 @@ Item {
         }
     }
 
-    // A trusted, previously-paired Bluetooth audio device should behave like a
-    // normal laptop headset: opening/wearing it is enough. Failed connect
-    // attempts are harmless while it is in the case or out of range.
     Timer {
         interval: 6000
         repeat: true
@@ -155,15 +146,14 @@ Item {
             "-lc",
             "command -v wpctl >/dev/null 2>&1 || exit 0; " +
             "addr=\"${BT_ADDR:-}\"; name=\"${BT_NAME:-}\"; key=$(printf '%s' \"$addr\" | tr ':' '_'); " +
-            "get_id() { sed -n \"/$1:/,/$2:/p\" | sed -n 's/^[^0-9]*\\([0-9][0-9]*\\)\\..*/\\1/p' | head -n1; }; " +
             "for attempt in 1 2 3 4 5 6; do " +
             "plain=$(wpctl status -n 2>/dev/null || true); pretty=$(wpctl status 2>/dev/null || true); " +
             "sink=''; source=''; " +
             "if [ -n \"$key\" ]; then " +
-            "sink=$(printf '%s\\n' \"$plain\" | sed -n '/Sinks:/,/Sources:/p' | grep -i \"$key\" | get_id Sinks Sources); " +
-            "source=$(printf '%s\\n' \"$plain\" | sed -n '/Sources:/,/Filters:/p' | grep -i \"$key\" | get_id Sources Filters); fi; " +
+            "sink=$(printf '%s\\n' \"$plain\" | sed -n '/Sinks:/,/Sources:/p' | grep -i \"$key\" | sed -n 's/^[^0-9]*\\([0-9][0-9]*\\)\\..*/\\1/p' | head -n1); " +
+            "source=$(printf '%s\\n' \"$plain\" | sed -n '/Sources:/,/Filters:/p' | grep -i \"$key\" | grep -vi monitor | sed -n 's/^[^0-9]*\\([0-9][0-9]*\\)\\..*/\\1/p' | head -n1); fi; " +
             "if [ -z \"$sink\" ] && [ -n \"$name\" ]; then sink=$(printf '%s\\n' \"$pretty\" | sed -n '/Sinks:/,/Sources:/p' | grep -Fi \"$name\" | sed -n 's/^[^0-9]*\\([0-9][0-9]*\\)\\..*/\\1/p' | head -n1); fi; " +
-            "if [ -z \"$source\" ] && [ -n \"$name\" ]; then source=$(printf '%s\\n' \"$pretty\" | sed -n '/Sources:/,/Filters:/p' | grep -Fi \"$name\" | sed -n 's/^[^0-9]*\\([0-9][0-9]*\\)\\..*/\\1/p' | head -n1); fi; " +
+            "if [ -z \"$source\" ] && [ -n \"$name\" ]; then source=$(printf '%s\\n' \"$pretty\" | sed -n '/Sources:/,/Filters:/p' | grep -Fi \"$name\" | grep -vi monitor | sed -n 's/^[^0-9]*\\([0-9][0-9]*\\)\\..*/\\1/p' | head -n1); fi; " +
             "[ -n \"$sink\" ] || sink=$(printf '%s\\n' \"$plain\" | sed -n '/Sinks:/,/Sources:/p' | grep -i bluez | sed -n 's/^[^0-9]*\\([0-9][0-9]*\\)\\..*/\\1/p' | head -n1); " +
             "[ -n \"$source\" ] || source=$(printf '%s\\n' \"$plain\" | sed -n '/Sources:/,/Filters:/p' | grep -i bluez | grep -vi monitor | sed -n 's/^[^0-9]*\\([0-9][0-9]*\\)\\..*/\\1/p' | head -n1); " +
             "[ -n \"$sink\" ] && wpctl set-default \"$sink\" >/dev/null 2>&1 || true; " +
