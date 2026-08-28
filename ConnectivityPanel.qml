@@ -28,6 +28,7 @@ Item {
             easing.type: Easing.OutCubic
         }
     }
+
     Behavior on scale {
         NumberAnimation {
             duration: 175
@@ -38,15 +39,21 @@ Item {
 
     component MiniToggle: Rectangle {
         id: toggle
+
         property bool checked: false
         property bool available: true
         signal toggled()
+
         width: 34
         height: 20
         radius: 10
         opacity: available ? 1 : 0.35
         color: checked ? "#30d158" : "#343438"
-        Behavior on color { ColorAnimation { duration: 145 } }
+
+        Behavior on color {
+            ColorAnimation { duration: 145 }
+        }
+
         Rectangle {
             width: 16
             height: 16
@@ -54,6 +61,7 @@ Item {
             y: 2
             x: toggle.checked ? toggle.width - width - 2 : 2
             color: "#f5f5f7"
+
             Behavior on x {
                 NumberAnimation {
                     duration: 185
@@ -62,6 +70,7 @@ Item {
                 }
             }
         }
+
         MouseArea {
             anchors.fill: parent
             enabled: toggle.available
@@ -72,14 +81,26 @@ Item {
 
     component RoundButton: Rectangle {
         id: button
+
         property string glyph: "↻"
         signal clicked()
+
         width: 27
         height: 27
         radius: 13.5
         color: buttonMouse.containsMouse ? "#2c2c2e" : "#1c1c1e"
-        Behavior on color { ColorAnimation { duration: 110 } }
-        Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
+
+        Behavior on color {
+            ColorAnimation { duration: 110 }
+        }
+
+        Behavior on scale {
+            NumberAnimation {
+                duration: 120
+                easing.type: Easing.OutBack
+            }
+        }
+
         Text {
             anchors.centerIn: parent
             text: button.glyph
@@ -87,6 +108,7 @@ Item {
             font.pixelSize: 14
             font.weight: Font.Medium
         }
+
         MouseArea {
             id: buttonMouse
             anchors.fill: parent
@@ -103,14 +125,20 @@ Item {
     ListModel { id: bluetoothModel }
 
     function wifiScript(rescan) {
-        var scan = rescan ? "nmcli device wifi rescan >/dev/null 2>&1 || true; " : ""
+        var scan = rescan
+            ? "nmcli device wifi rescan >/dev/null 2>&1 || true; "
+            : ""
+
         return "command -v nmcli >/dev/null 2>&1 || exit 0; " + scan +
             "while IFS=$'\\t' read -r uuid type; do " +
             "[ \"$type\" = \"802-11-wireless\" ] || continue; " +
             "ssid=$(nmcli -g 802-11-wireless.ssid connection show uuid \"$uuid\" 2>/dev/null | head -n1); " +
             "[ -n \"$ssid\" ] && printf 'K\\t%s\\t%s\\n' \"$ssid\" \"$uuid\"; " +
             "done < <(nmcli -t --escape no --separator $'\\t' -f UUID,TYPE connection show 2>/dev/null); " +
-            "nmcli -t --escape no --separator $'\\t' -f IN-USE,SSID,SIGNAL,SECURITY device wifi list --rescan no 2>/dev/null | sed $'s/^/N\\t/'"
+            "active=$(nmcli -t --escape no --separator $'\\t' -f IN-USE,SSID device wifi list --rescan no 2>/dev/null | while IFS=$'\\t' read -r inuse ssid; do if [ \"$inuse\" = \"*\" ]; then printf '%s' \"$ssid\"; break; fi; done); " +
+            "printf 'A\\t%s\\n' \"$active\"; " +
+            "nmcli -t --escape no --separator $'\\t' -f IN-USE,SSID,SIGNAL,SECURITY device wifi list --rescan no 2>/dev/null | " +
+            "while IFS=$'\\t' read -r inuse ssid signal security; do printf 'N\\t%s\\t%s\\t%s\\t%s\\n' \"$inuse\" \"$ssid\" \"$signal\" \"$security\"; done"
     }
 
     function refreshAirplane() {
@@ -122,6 +150,7 @@ Item {
         refreshAirplane()
         if (!active || panelType !== "wifi" || wifiListProbe.running)
             return
+
         wifiListProbe.command = ["bash", "-lc", wifiScript(rescan)]
         wifiListProbe.running = true
     }
@@ -130,6 +159,7 @@ Item {
         refreshAirplane()
         if (!active || panelType !== "bluetooth")
             return
+
         if (scan && !bluetoothScan.running)
             bluetoothScan.running = true
         if (!bluetoothListProbe.running)
@@ -153,24 +183,53 @@ Item {
     function consumeWifiList(raw) {
         var known = ({})
         var found = ({})
+        var activeSsid = ""
         var lines = raw.split("\n")
+
         for (var i = 0; i < lines.length; ++i) {
-            if (lines[i] === "") continue
+            if (lines[i] === "")
+                continue
+
             var p = lines[i].split("\t")
+
             if (p[0] === "K" && p.length >= 3) {
                 known[p[1]] = p[2]
                 continue
             }
-            if (p[0] !== "N" || p.length < 4 || p[2] === "") continue
+
+            if (p[0] === "A" && p.length >= 2) {
+                activeSsid = p.slice(1).join("\t")
+                continue
+            }
+
+            if (p[0] !== "N" || p.length < 4 || p[2] === "")
+                continue
+
+            var ssid = p[2]
             var item = {
-                ssid: p[2],
+                ssid: ssid,
                 active: p[1] === "*",
                 strength: Math.max(0, Math.min(100, parseInt(p[3]) || 0)),
                 security: p.length > 4 ? p.slice(4).join("\t") : ""
             }
-            if (!found[item.ssid] || item.active || item.strength > found[item.ssid].strength)
-                found[item.ssid] = item
+
+            if (!found[ssid] || item.active || item.strength > found[ssid].strength)
+                found[ssid] = item
         }
+
+        if (activeSsid !== "") {
+            if (found[activeSsid]) {
+                found[activeSsid].active = true
+            } else {
+                found[activeSsid] = {
+                    ssid: activeSsid,
+                    active: true,
+                    strength: 100,
+                    security: ""
+                }
+            }
+        }
+
         var result = []
         for (var key in found) {
             var row = found[key]
@@ -178,12 +237,17 @@ Item {
             row.uuid = row.known ? known[key] : ""
             result.push(row)
         }
+
         result.sort(function(a, b) {
-            if (a.active !== b.active) return a.active ? -1 : 1
-            if (a.known !== b.known) return a.known ? -1 : 1
-            if (a.strength !== b.strength) return b.strength - a.strength
+            if (a.active !== b.active)
+                return a.active ? -1 : 1
+            if (a.known !== b.known)
+                return a.known ? -1 : 1
+            if (a.strength !== b.strength)
+                return b.strength - a.strength
             return a.ssid.localeCompare(b.ssid)
         })
+
         wifiModel.clear()
         for (var j = 0; j < result.length; ++j)
             wifiModel.append(result[j])
@@ -192,61 +256,91 @@ Item {
     function consumeBluetoothList(raw) {
         var result = []
         var lines = raw.split("\n")
+
         for (var i = 0; i < lines.length; ++i) {
-            if (lines[i] === "") continue
+            if (lines[i] === "")
+                continue
+
             var p = lines[i].split("\t")
-            if (p[0] !== "D" || p.length < 6) continue
+            if (p[0] !== "D" || p.length < 6)
+                continue
+
+            var label = p.slice(5).join("\t").trim()
+            if (label === "")
+                continue
+
             result.push({
                 address: p[1],
                 paired: p[2] === "yes",
                 connected: p[3] === "yes",
                 trusted: p[4] === "yes",
-                deviceName: p.slice(5).join("\t")
+                deviceName: label
             })
         }
+
         result.sort(function(a, b) {
-            if (a.connected !== b.connected) return a.connected ? -1 : 1
-            if (a.paired !== b.paired) return a.paired ? -1 : 1
+            if (a.connected !== b.connected)
+                return a.connected ? -1 : 1
+            if (a.paired !== b.paired)
+                return a.paired ? -1 : 1
             return a.deviceName.localeCompare(b.deviceName)
         })
+
         bluetoothModel.clear()
         for (var j = 0; j < result.length; ++j)
             bluetoothModel.append(result[j])
     }
 
     function selectWifi(ssid, security, known, uuid) {
-        if (wifiAction.running || wifiForget.running) return
+        if (wifiAction.running || wifiForget.running)
+            return
+
         if (known && uuid !== "") {
             wifiPasswordSsid = ""
             wifiAction.exec(["nmcli", "connection", "up", "uuid", uuid])
             return
         }
+
         var secured = security !== "" && security !== "--"
         if (secured) {
             wifiPasswordSsid = ssid
             return
         }
+
         wifiPasswordSsid = ""
         wifiAction.exec(["nmcli", "device", "wifi", "connect", ssid])
     }
 
     function submitWifiPassword(ssid, password) {
-        if (password === "" || wifiAction.running) return
+        if (password === "" || wifiAction.running)
+            return
+
         wifiAction.exec({
-            command: ["bash", "-lc", "nmcli --wait 20 device wifi connect \"$NM_SSID\" password \"$NM_PASSWORD\""],
-            environment: ({ NM_SSID: ssid, NM_PASSWORD: password })
+            command: [
+                "bash",
+                "-lc",
+                "nmcli --wait 20 device wifi connect \"$NM_SSID\" password \"$NM_PASSWORD\""
+            ],
+            environment: ({
+                NM_SSID: ssid,
+                NM_PASSWORD: password
+            })
         })
         wifiPasswordSsid = ""
     }
 
     function forgetWifi(uuid) {
-        if (uuid === "" || wifiForget.running) return
+        if (uuid === "" || wifiForget.running)
+            return
+
         wifiPasswordSsid = ""
         wifiForget.exec(["nmcli", "connection", "delete", "uuid", uuid])
     }
 
     function selectBluetooth(address, paired, connected) {
-        if (bluetoothAction.running || bluetoothForget.running) return
+        if (bluetoothAction.running || bluetoothForget.running)
+            return
+
         if (connected) {
             bluetoothAction.exec(["bluetoothctl", "disconnect", address])
         } else if (paired) {
@@ -254,7 +348,8 @@ Item {
         } else {
             bluetoothAction.exec({
                 command: [
-                    "bash", "-lc",
+                    "bash",
+                    "-lc",
                     "bluetoothctl power on >/dev/null 2>&1 || true; " +
                     "bluetoothctl --timeout 20 pair \"$BT_ADDR\" >/dev/null 2>&1 || exit 1; " +
                     "bluetoothctl trust \"$BT_ADDR\" >/dev/null 2>&1 || true; " +
@@ -266,14 +361,18 @@ Item {
     }
 
     function forgetBluetooth(address) {
-        if (address === "" || bluetoothForget.running) return
+        if (address === "" || bluetoothForget.running)
+            return
         bluetoothForget.exec(["bluetoothctl", "remove", address])
     }
 
     function toggleAirplane() {
-        if (!airplaneAvailable || radioAction.running) return
+        if (!airplaneAvailable || radioAction.running)
+            return
+
         radioAction.command = [
-            "bash", "-lc",
+            "bash",
+            "-lc",
             airplaneMode
                 ? "rfkill unblock all >/dev/null 2>&1 || exit 1; nmcli networking on >/dev/null 2>&1 || true; nmcli radio wifi on >/dev/null 2>&1 || true; bluetoothctl power on >/dev/null 2>&1 || true"
                 : "rfkill block all >/dev/null 2>&1"
@@ -296,19 +395,25 @@ Item {
     }
 
     onActiveChanged: {
-        if (active) Qt.callLater(function() { root.refreshCurrent(true) })
-        else wifiPasswordSsid = ""
+        if (active)
+            Qt.callLater(function() { root.refreshCurrent(true) })
+        else
+            wifiPasswordSsid = ""
     }
+
     onPanelTypeChanged: {
         wifiPasswordSsid = ""
-        if (active) Qt.callLater(function() { root.refreshCurrent(true) })
+        if (active)
+            Qt.callLater(function() { root.refreshCurrent(true) })
     }
 
     Item {
+        id: header
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
         height: 48
+
         Text {
             id: backGlyph
             anchors.left: parent.left
@@ -318,15 +423,18 @@ Item {
             color: "#d1d1d6"
             font.pixelSize: 26
         }
+
         Text {
             anchors.left: backGlyph.right
             anchors.leftMargin: 8
             anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenterOffset: root.panelType === "wifi" ? 2 : 0
             text: root.panelType === "wifi" ? "Wi-Fi" : "Bluetooth"
             color: "#f5f5f7"
             font.pixelSize: 16
             font.weight: Font.DemiBold
         }
+
         MouseArea {
             anchors.left: parent.left
             anchors.top: parent.top
@@ -335,6 +443,7 @@ Item {
             cursorShape: Qt.PointingHandCursor
             onClicked: root.backRequested()
         }
+
         Rectangle {
             anchors.right: parent.right
             anchors.rightMargin: 24
@@ -342,7 +451,9 @@ Item {
             width: 7
             height: 7
             radius: 3.5
-            color: root.panelType === "wifi" ? (root.wifiEnabled ? "#30d158" : "#636366") : (root.bluetoothPowered ? "#30d158" : "#636366")
+            color: root.panelType === "wifi"
+                ? (root.wifiEnabled ? "#30d158" : "#636366")
+                : (root.bluetoothPowered ? "#30d158" : "#636366")
         }
     }
 
@@ -364,6 +475,7 @@ Item {
             font.pixelSize: 12
             font.weight: Font.Medium
         }
+
         MiniToggle {
             anchors.left: airplaneText.right
             anchors.leftMargin: 9
@@ -372,6 +484,7 @@ Item {
             available: root.airplaneAvailable
             onToggled: root.toggleAirplane()
         }
+
         RoundButton {
             anchors.right: parent.right
             anchors.rightMargin: 20
@@ -379,6 +492,7 @@ Item {
             glyph: "↻"
             onClicked: root.refreshCurrent(true)
         }
+
         MiniToggle {
             id: radioToggle
             anchors.right: parent.right
@@ -387,6 +501,7 @@ Item {
             checked: root.panelType === "wifi" ? root.wifiEnabled : root.bluetoothPowered
             onToggled: root.toggleCurrentRadio()
         }
+
         Text {
             anchors.right: radioToggle.left
             anchors.rightMargin: 9
@@ -440,25 +555,55 @@ Item {
             boundsMovement: Flickable.FollowBoundsBehavior
             flickDeceleration: 3000
             maximumFlickVelocity: 4300
-            rebound: Transition { NumberAnimation { properties: "x,y"; duration: 300; easing.type: Easing.OutBack; easing.overshoot: 0.2 } }
-            add: Transition { NumberAnimation { properties: "opacity,scale"; from: 0; to: 1; duration: 170; easing.type: Easing.OutBack } }
-            displaced: Transition { NumberAnimation { properties: "x,y"; duration: 180; easing.type: Easing.OutCubic } }
+
+            rebound: Transition {
+                NumberAnimation {
+                    properties: "x,y"
+                    duration: 300
+                    easing.type: Easing.OutBack
+                    easing.overshoot: 0.2
+                }
+            }
+
+            add: Transition {
+                NumberAnimation {
+                    properties: "opacity,scale"
+                    from: 0
+                    to: 1
+                    duration: 170
+                    easing.type: Easing.OutBack
+                }
+            }
+
+            displaced: Transition {
+                NumberAnimation {
+                    properties: "x,y"
+                    duration: 180
+                    easing.type: Easing.OutCubic
+                }
+            }
 
             delegate: Item {
                 id: wifiRow
+
                 width: wifiList.width
                 height: 46
                 property bool editing: root.wifiPasswordSsid === model.ssid
+
                 onEditingChanged: {
-                    if (editing) Qt.callLater(function() { passwordInput.forceActiveFocus() })
-                    else passwordInput.text = ""
+                    if (editing)
+                        Qt.callLater(function() { passwordInput.forceActiveFocus() })
+                    else
+                        passwordInput.text = ""
                 }
+
                 Rectangle {
                     anchors.fill: parent
                     radius: 10
                     color: rowHover.hovered ? "#161618" : "transparent"
                     Behavior on color { ColorAnimation { duration: 100 } }
                 }
+
                 Item {
                     id: signalIcon
                     anchors.left: parent.left
@@ -466,10 +611,39 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     width: 17
                     height: 14
-                    Rectangle { anchors.left: parent.left; anchors.bottom: parent.bottom; width: 3; height: 4; radius: 1.5; color: model.strength > 0 ? (model.active ? "#30d158" : "#d1d1d6") : "#3a3a3c" }
-                    Rectangle { anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; width: 3; height: 8; radius: 1.5; color: model.strength >= 40 ? (model.active ? "#30d158" : "#d1d1d6") : "#3a3a3c" }
-                    Rectangle { anchors.right: parent.right; anchors.bottom: parent.bottom; width: 3; height: 12; radius: 1.5; color: model.strength >= 70 ? (model.active ? "#30d158" : "#d1d1d6") : "#3a3a3c" }
+
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.bottom: parent.bottom
+                        width: 3
+                        height: 4
+                        radius: 1.5
+                        color: model.strength > 0
+                            ? (model.active ? "#30d158" : "#d1d1d6")
+                            : "#3a3a3c"
+                    }
+                    Rectangle {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.bottom: parent.bottom
+                        width: 3
+                        height: 8
+                        radius: 1.5
+                        color: model.strength >= 40
+                            ? (model.active ? "#30d158" : "#d1d1d6")
+                            : "#3a3a3c"
+                    }
+                    Rectangle {
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        width: 3
+                        height: 12
+                        radius: 1.5
+                        color: model.strength >= 70
+                            ? (model.active ? "#30d158" : "#d1d1d6")
+                            : "#3a3a3c"
+                    }
                 }
+
                 Text {
                     anchors.left: signalIcon.right
                     anchors.leftMargin: 12
@@ -483,13 +657,20 @@ Item {
                     font.weight: model.active ? Font.DemiBold : Font.Medium
                     elide: Text.ElideRight
                 }
+
                 MouseArea {
                     z: 1
                     anchors.fill: parent
                     enabled: !wifiRow.editing
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: root.selectWifi(model.ssid, model.security, model.known, model.uuid)
+                    onClicked: root.selectWifi(
+                        model.ssid,
+                        model.security,
+                        model.known,
+                        model.uuid
+                    )
                 }
+
                 Item {
                     z: 2
                     anchors.left: signalIcon.right
@@ -499,8 +680,25 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     height: 30
                     visible: wifiRow.editing
-                    Rectangle { anchors.fill: parent; radius: 8; color: "#1c1c1e"; border.width: 1; border.color: passwordInput.activeFocus ? "#5a5a60" : "#2c2c2e" }
-                    Text { anchors.left: parent.left; anchors.leftMargin: 10; anchors.verticalCenter: parent.verticalCenter; visible: passwordInput.text.length === 0; text: "Password"; color: "#636366"; font.pixelSize: 13 }
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 8
+                        color: "#1c1c1e"
+                        border.width: 1
+                        border.color: passwordInput.activeFocus ? "#5a5a60" : "#2c2c2e"
+                    }
+
+                    Text {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: passwordInput.text.length === 0
+                        text: "Password"
+                        color: "#636366"
+                        font.pixelSize: 13
+                    }
+
                     TextInput {
                         id: passwordInput
                         anchors.left: parent.left
@@ -515,9 +713,17 @@ Item {
                         selectionColor: "#48484a"
                         selectedTextColor: "white"
                         clip: true
-                        Keys.onReturnPressed: { root.submitWifiPassword(model.ssid, text); text = "" }
-                        Keys.onEnterPressed: { root.submitWifiPassword(model.ssid, text); text = "" }
+
+                        Keys.onReturnPressed: {
+                            root.submitWifiPassword(model.ssid, text)
+                            text = ""
+                        }
+                        Keys.onEnterPressed: {
+                            root.submitWifiPassword(model.ssid, text)
+                            text = ""
+                        }
                     }
+
                     Text {
                         id: submitPassword
                         anchors.right: parent.right
@@ -526,9 +732,19 @@ Item {
                         text: "↵"
                         color: "#b8b8bd"
                         font.pixelSize: 15
-                        MouseArea { anchors.fill: parent; anchors.margins: -7; cursorShape: Qt.PointingHandCursor; onClicked: { root.submitWifiPassword(model.ssid, passwordInput.text); passwordInput.text = "" } }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            anchors.margins: -7
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                root.submitWifiPassword(model.ssid, passwordInput.text)
+                                passwordInput.text = ""
+                            }
+                        }
                     }
                 }
+
                 Text {
                     z: 3
                     anchors.right: parent.right
@@ -539,8 +755,17 @@ Item {
                     color: forgetWifiMouse.containsMouse ? "#b8b8bd" : "#636366"
                     font.pixelSize: 17
                     font.weight: Font.Medium
-                    MouseArea { id: forgetWifiMouse; anchors.fill: parent; anchors.margins: -9; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.forgetWifi(model.uuid) }
+
+                    MouseArea {
+                        id: forgetWifiMouse
+                        anchors.fill: parent
+                        anchors.margins: -9
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.forgetWifi(model.uuid)
+                    }
                 }
+
                 HoverHandler { id: rowHover }
             }
         }
@@ -578,15 +803,46 @@ Item {
             boundsMovement: Flickable.FollowBoundsBehavior
             flickDeceleration: 3000
             maximumFlickVelocity: 4300
-            rebound: Transition { NumberAnimation { properties: "x,y"; duration: 300; easing.type: Easing.OutBack; easing.overshoot: 0.2 } }
-            add: Transition { NumberAnimation { properties: "opacity,scale"; from: 0; to: 1; duration: 170; easing.type: Easing.OutBack } }
-            displaced: Transition { NumberAnimation { properties: "x,y"; duration: 180; easing.type: Easing.OutCubic } }
+
+            rebound: Transition {
+                NumberAnimation {
+                    properties: "x,y"
+                    duration: 300
+                    easing.type: Easing.OutBack
+                    easing.overshoot: 0.2
+                }
+            }
+
+            add: Transition {
+                NumberAnimation {
+                    properties: "opacity,scale"
+                    from: 0
+                    to: 1
+                    duration: 170
+                    easing.type: Easing.OutBack
+                }
+            }
+
+            displaced: Transition {
+                NumberAnimation {
+                    properties: "x,y"
+                    duration: 180
+                    easing.type: Easing.OutCubic
+                }
+            }
 
             delegate: Item {
                 id: btRow
+
                 width: bluetoothList.width
                 height: 46
-                Rectangle { anchors.fill: parent; radius: 10; color: btHover.hovered ? "#161618" : "transparent" }
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 10
+                    color: btHover.hovered ? "#161618" : "transparent"
+                }
+
                 Rectangle {
                     anchors.left: parent.left
                     anchors.leftMargin: 13
@@ -594,8 +850,11 @@ Item {
                     width: 8
                     height: 8
                     radius: 4
-                    color: model.connected ? "#30d158" : model.paired ? "#8e8e93" : "#48484a"
+                    color: model.connected
+                        ? "#30d158"
+                        : model.paired ? "#8e8e93" : "#48484a"
                 }
+
                 Text {
                     anchors.left: parent.left
                     anchors.leftMargin: 35
@@ -609,6 +868,7 @@ Item {
                     font.weight: model.connected ? Font.DemiBold : Font.Medium
                     elide: Text.ElideRight
                 }
+
                 Text {
                     anchors.left: parent.left
                     anchors.leftMargin: 35
@@ -620,7 +880,18 @@ Item {
                     font.pixelSize: 10
                     font.weight: Font.Medium
                 }
-                MouseArea { z: 1; anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.selectBluetooth(model.address, model.paired, model.connected) }
+
+                MouseArea {
+                    z: 1
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.selectBluetooth(
+                        model.address,
+                        model.paired,
+                        model.connected
+                    )
+                }
+
                 Text {
                     z: 3
                     anchors.right: parent.right
@@ -631,8 +902,17 @@ Item {
                     color: forgetBtMouse.containsMouse ? "#b8b8bd" : "#636366"
                     font.pixelSize: 17
                     font.weight: Font.Medium
-                    MouseArea { id: forgetBtMouse; anchors.fill: parent; anchors.margins: -9; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.forgetBluetooth(model.address) }
+
+                    MouseArea {
+                        id: forgetBtMouse
+                        anchors.fill: parent
+                        anchors.margins: -9
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.forgetBluetooth(model.address)
+                    }
                 }
+
                 HoverHandler { id: btHover }
             }
         }
@@ -648,12 +928,24 @@ Item {
     Process {
         id: airplaneProbe
         command: [
-            "bash", "-lc",
-            "command -v rfkill >/dev/null 2>&1 || { printf 'unavailable\\nunblocked\\n'; exit 0; }; read -r total blocked <<<$(rfkill -n -o SOFT 2>/dev/null | awk '{t++; if ($1 ~ /^blocked$/) b++} END {print t+0, b+0}'); if (( total > 0 )); then printf 'available\\n'; if (( blocked == total )); then printf 'blocked\\n'; else printf 'unblocked\\n'; fi; else printf 'unavailable\\nunblocked\\n'; fi"
+            "bash",
+            "-lc",
+            "command -v rfkill >/dev/null 2>&1 || { printf 'unavailable\\nunblocked\\n'; exit 0; }; " +
+            "read -r total blocked <<<$(rfkill -n -o SOFT 2>/dev/null | awk '{t++; if ($1 ~ /^blocked$/) b++} END {print t+0, b+0}'); " +
+            "if (( total > 0 )); then printf 'available\\n'; if (( blocked == total )); then printf 'blocked\\n'; else printf 'unblocked\\n'; fi; else printf 'unavailable\\nunblocked\\n'; fi"
         ]
-        stdout: StdioCollector { onStreamFinished: root.consumeAirplane(text) }
+        stdout: StdioCollector {
+            onStreamFinished: root.consumeAirplane(text)
+        }
     }
-    Process { id: wifiListProbe; stdout: StdioCollector { onStreamFinished: root.consumeWifiList(text) } }
+
+    Process {
+        id: wifiListProbe
+        stdout: StdioCollector {
+            onStreamFinished: root.consumeWifiList(text)
+        }
+    }
+
     Process {
         id: wifiAction
         onRunningChanged: if (!running) {
@@ -663,16 +955,47 @@ Item {
             root.statusRefreshRequested()
         }
     }
-    Process { id: wifiForget; onRunningChanged: if (!running) { root.refreshWifi(true); root.statusRefreshRequested() } }
+
+    Process {
+        id: wifiForget
+        onRunningChanged: if (!running) {
+            root.refreshWifi(true)
+            root.statusRefreshRequested()
+        }
+    }
+
     Process {
         id: bluetoothListProbe
         command: [
-            "bash", "-lc",
-            "command -v bluetoothctl >/dev/null 2>&1 || exit 0; bluetoothctl devices 2>/dev/null | while read -r tag addr name; do [ \"$tag\" = \"Device\" ] || continue; info=$(bluetoothctl info \"$addr\" 2>/dev/null); paired=$(printf '%s\\n' \"$info\" | awk '/Paired:/ {print $2; exit}'); connected=$(printf '%s\\n' \"$info\" | awk '/Connected:/ {print $2; exit}'); trusted=$(printf '%s\\n' \"$info\" | awk '/Trusted:/ {print $2; exit}'); printf 'D\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$addr\" \"${paired:-no}\" \"${connected:-no}\" \"${trusted:-no}\" \"$name\"; done"
+            "bash",
+            "-lc",
+            "command -v bluetoothctl >/dev/null 2>&1 || exit 0; " +
+            "bluetoothctl devices 2>/dev/null | while read -r tag addr listedName; do " +
+            "[ \"$tag\" = \"Device\" ] || continue; " +
+            "info=$(bluetoothctl info \"$addr\" 2>/dev/null); " +
+            "paired=$(printf '%s\\n' \"$info\" | awk '/Paired:/ {print $2; exit}'); " +
+            "connected=$(printf '%s\\n' \"$info\" | awk '/Connected:/ {print $2; exit}'); " +
+            "trusted=$(printf '%s\\n' \"$info\" | awk '/Trusted:/ {print $2; exit}'); " +
+            "alias=$(printf '%s\\n' \"$info\" | sed -n 's/^[[:space:]]*Alias: //p' | head -n1); " +
+            "devname=$(printf '%s\\n' \"$info\" | sed -n 's/^[[:space:]]*Name: //p' | head -n1); " +
+            "label=\"${alias:-${devname:-$listedName}}\"; " +
+            "if printf '%s' \"$label\" | grep -Eiq '^([0-9a-f]{2}[:-]){5}[0-9a-f]{2}$'; then label=''; fi; " +
+            "if [ -z \"$label\" ]; then if [ \"${paired:-no}\" = yes ] || [ \"${connected:-no}\" = yes ]; then label='Bluetooth device'; else continue; fi; fi; " +
+            "printf 'D\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$addr\" \"${paired:-no}\" \"${connected:-no}\" \"${trusted:-no}\" \"$label\"; " +
+            "done"
         ]
-        stdout: StdioCollector { onStreamFinished: root.consumeBluetoothList(text) }
+        stdout: StdioCollector {
+            onStreamFinished: root.consumeBluetoothList(text)
+        }
     }
-    Process { id: bluetoothScan; command: ["bluetoothctl", "--timeout", "5", "scan", "on"]; onRunningChanged: if (!running) root.refreshBluetooth(false) }
+
+    Process {
+        id: bluetoothScan
+        command: ["bluetoothctl", "--timeout", "5", "scan", "on"]
+        onRunningChanged: if (!running)
+            root.refreshBluetooth(false)
+    }
+
     Process {
         id: bluetoothAction
         onRunningChanged: if (!running) {
@@ -681,8 +1004,39 @@ Item {
             root.statusRefreshRequested()
         }
     }
-    Process { id: bluetoothForget; onRunningChanged: if (!running) { root.refreshBluetooth(true); root.statusRefreshRequested() } }
-    Process { id: radioAction; onRunningChanged: if (!running) { root.refreshAirplane(); root.statusRefreshRequested(); root.refreshCurrent(true) } }
-    Process { id: wifiRadioAction; onRunningChanged: if (!running) { root.refreshAirplane(); root.statusRefreshRequested(); root.refreshWifi(true) } }
-    Process { id: bluetoothRadioAction; onRunningChanged: if (!running) { root.refreshAirplane(); root.statusRefreshRequested(); root.refreshBluetooth(true) } }
+
+    Process {
+        id: bluetoothForget
+        onRunningChanged: if (!running) {
+            root.refreshBluetooth(true)
+            root.statusRefreshRequested()
+        }
+    }
+
+    Process {
+        id: radioAction
+        onRunningChanged: if (!running) {
+            root.refreshAirplane()
+            root.statusRefreshRequested()
+            root.refreshCurrent(true)
+        }
+    }
+
+    Process {
+        id: wifiRadioAction
+        onRunningChanged: if (!running) {
+            root.refreshAirplane()
+            root.statusRefreshRequested()
+            root.refreshWifi(true)
+        }
+    }
+
+    Process {
+        id: bluetoothRadioAction
+        onRunningChanged: if (!running) {
+            root.refreshAirplane()
+            root.statusRefreshRequested()
+            root.refreshBluetooth(true)
+        }
+    }
 }
