@@ -14,6 +14,8 @@ Item {
     property string dateText: ""
 
     property string pendingTimeZone: ""
+    property bool saveQueued: false
+    property bool clockRefreshQueued: false
 
     width: 0
     height: 0
@@ -29,8 +31,12 @@ Item {
     }
 
     function save() {
-        if (!loaded || saveProcess.running)
+        if (!loaded)
             return
+        if (saveProcess.running) {
+            saveQueued = true
+            return
+        }
         saveProcess.environment = ({
             NOTCH_ALWAYS: alwaysShowDateTime ? "1" : "0",
             NOTCH_24H: use24HourTime ? "1" : "0",
@@ -83,8 +89,12 @@ Item {
     }
 
     function refreshClock() {
-        if (!loaded || clockProcess.running)
+        if (!loaded)
             return
+        if (clockProcess.running) {
+            clockRefreshQueued = true
+            return
+        }
         clockProcess.environment = ({
             NOTCH_TZ: timeZone,
             NOTCH_24H: use24HourTime ? "1" : "0"
@@ -147,8 +157,13 @@ Item {
             "\"$NOTCH_ALWAYS\" \"$NOTCH_24H\" \"$NOTCH_BATTERY\" \"$NOTCH_TZ\" > \"$tmp\"; " +
             "mv -f \"$tmp\" \"$dir/settings\""
         ]
-        onRunningChanged: if (!running)
+        onRunningChanged: if (!running) {
             environment = ({})
+            if (root.saveQueued) {
+                root.saveQueued = false
+                Qt.callLater(root.save)
+            }
+        }
     }
 
     Process {
@@ -183,10 +198,10 @@ Item {
         command: [
             "bash",
             "-lc",
-            "if [ \"$NOTCH_24H\" = 1 ]; then fmt='%H:%M'; else fmt='%I:%M %p'; fi; " +
+            "if [ \"$NOTCH_24H\" = 1 ]; then fmt='%H:%M'; else fmt='%-I:%M %p'; fi; " +
             "if [ -n \"$NOTCH_TZ\" ]; then " +
-            "TZ=\"$NOTCH_TZ\" date \"+$fmt\\t%a, %-d %b\"; " +
-            "else date \"+$fmt\\t%a, %-d %b\"; fi"
+            "TZ=\"$NOTCH_TZ\" date \"+$fmt%t%a, %-d %b\"; " +
+            "else date \"+$fmt%t%a, %-d %b\"; fi"
         ]
         stdout: StdioCollector {
             onStreamFinished: {
@@ -198,7 +213,12 @@ Item {
                 }
             }
         }
-        onRunningChanged: if (!running)
+        onRunningChanged: if (!running) {
             environment = ({})
+            if (root.clockRefreshQueued) {
+                root.clockRefreshQueued = false
+                Qt.callLater(root.refreshClock)
+            }
+        }
     }
 }
