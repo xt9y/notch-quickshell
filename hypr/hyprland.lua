@@ -11,10 +11,9 @@ hl.monitor({
     position = "auto",
     scale = "auto",
 
-    -- Keep tiled windows comfortably below the physical MacBook notch.
-    -- This is added on top of Hyprland's normal outer window gap.
+    -- Keep tiled windows just below the physical MacBook notch.
     reserved_area = {
-        top = 40,
+        top = 34,
         bottom = 0,
         left = 0,
         right = 0,
@@ -174,14 +173,4 @@ hl.window_rule({
     name = "suppress-maximize-events",
     match = { class = ".*" },
     suppress_event = "maximize",
-})
-
--- Kitty is intentionally compact: roughly one third of the monitor in each
--- dimension, floating and centered instead of consuming a full tiled slot.
-hl.window_rule({
-    name = "compact-kitty",
-    match = { class = "kitty" },
-    float = true,
-    size = { "monitor_w * 0.33", "monitor_h * 0.33" },
-    center = true,
 })
