@@ -44,7 +44,6 @@ Item {
     signal detailBackRequested()
     signal statusRefreshRequested()
 
-    // ---------- NORMAL ----------
     Item {
         property bool active: root.displayMode === "normal" && root.expanded
         anchors.fill: parent
@@ -54,9 +53,7 @@ Item {
         enabled: active
         transformOrigin: Item.Top
 
-        Behavior on opacity {
-            NumberAnimation { duration: 145; easing.type: Easing.OutCubic }
-        }
+        Behavior on opacity { NumberAnimation { duration: 145; easing.type: Easing.OutCubic } }
         Behavior on scale {
             NumberAnimation {
                 duration: 190
@@ -111,13 +108,8 @@ Item {
                         width: Math.max(0, (batteryBody.width - 6) * root.batteryLevel)
                         radius: 1.7
                         color: root.batteryColor
-
-                        Behavior on width {
-                            NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
-                        }
-                        Behavior on color {
-                            ColorAnimation { duration: 180 }
-                        }
+                        Behavior on width { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                        Behavior on color { ColorAnimation { duration: 180 } }
                     }
                 }
 
@@ -151,7 +143,6 @@ Item {
         }
     }
 
-    // ---------- MUSIC ----------
     NotchMusic {
         anchors.fill: parent
         active: root.displayMode === "music" && root.musicSessionAvailable && root.expanded
@@ -165,7 +156,6 @@ Item {
         progress: root.musicProgress
     }
 
-    // ---------- COMPACT CONNECTIVITY ----------
     Item {
         property bool active: root.displayMode === "connectivity" && root.expanded
         anchors.fill: parent
@@ -175,9 +165,7 @@ Item {
         enabled: active
         transformOrigin: Item.Top
 
-        Behavior on opacity {
-            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
-        }
+        Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
         Behavior on scale {
             NumberAnimation {
                 duration: 185
@@ -260,7 +248,6 @@ Item {
         }
     }
 
-    // ---------- EXPANDED CONNECTIVITY ----------
     ConnectivityPanel {
         anchors.fill: parent
         active: (root.displayMode === "wifiPanel" || root.displayMode === "bluetoothPanel") && root.expanded
@@ -271,7 +258,6 @@ Item {
         onStatusRefreshRequested: root.statusRefreshRequested()
     }
 
-    // ---------- VOLUME ----------
     Item {
         property bool active: root.displayMode === "volume" && root.expanded
         anchors.fill: parent
@@ -280,9 +266,7 @@ Item {
         visible: opacity > 0.01
         transformOrigin: Item.Top
 
-        Behavior on opacity {
-            NumberAnimation { duration: 105; easing.type: Easing.OutCubic }
-        }
+        Behavior on opacity { NumberAnimation { duration: 105; easing.type: Easing.OutCubic } }
         Behavior on scale {
             NumberAnimation {
                 duration: 145
@@ -298,7 +282,6 @@ Item {
             height: root.normalHeight
 
             Text {
-                id: volumeLabel
                 anchors.left: parent.left
                 anchors.leftMargin: 24
                 anchors.verticalCenter: parent.verticalCenter
@@ -306,28 +289,6 @@ Item {
                 color: "white"
                 font.pixelSize: 15
                 font.weight: Font.Medium
-            }
-
-            Rectangle {
-                anchors.left: volumeLabel.right
-                anchors.leftMargin: 12
-                anchors.right: parent.right
-                anchors.rightMargin: 16
-                anchors.verticalCenter: parent.verticalCenter
-                height: 4
-                radius: 2
-                color: "#343438"
-
-                Rectangle {
-                    width: parent.width * (root.volumeMuted ? 0 : root.volumePercent / 100)
-                    height: parent.height
-                    radius: parent.radius
-                    color: "#f2f2f7"
-
-                    Behavior on width {
-                        NumberAnimation { duration: 55; easing.type: Easing.OutCubic }
-                    }
-                }
             }
         }
 
@@ -349,7 +310,6 @@ Item {
         }
     }
 
-    // ---------- BRIGHTNESS ----------
     Item {
         property bool active: root.displayMode === "brightness" && root.expanded
         anchors.fill: parent
@@ -358,9 +318,7 @@ Item {
         visible: opacity > 0.01
         transformOrigin: Item.Top
 
-        Behavior on opacity {
-            NumberAnimation { duration: 105; easing.type: Easing.OutCubic }
-        }
+        Behavior on opacity { NumberAnimation { duration: 105; easing.type: Easing.OutCubic } }
         Behavior on scale {
             NumberAnimation {
                 duration: 145
@@ -376,35 +334,12 @@ Item {
             height: root.normalHeight
 
             Text {
-                id: brightnessLabel
                 anchors.left: parent.left
                 anchors.leftMargin: 24
                 anchors.verticalCenter: parent.verticalCenter
                 text: "☀"
                 color: "white"
                 font.pixelSize: 18
-            }
-
-            Rectangle {
-                anchors.left: brightnessLabel.right
-                anchors.leftMargin: 13
-                anchors.right: parent.right
-                anchors.rightMargin: 16
-                anchors.verticalCenter: parent.verticalCenter
-                height: 4
-                radius: 2
-                color: "#343438"
-
-                Rectangle {
-                    width: parent.width * (root.brightnessPercent / 100)
-                    height: parent.height
-                    radius: parent.radius
-                    color: "#f2f2f7"
-
-                    Behavior on width {
-                        NumberAnimation { duration: 60; easing.type: Easing.OutCubic }
-                    }
-                }
             }
         }
 
@@ -426,7 +361,6 @@ Item {
         }
     }
 
-    // ---------- BATTERY ----------
     Item {
         property bool active: root.displayMode === "battery" && root.expanded
         anchors.fill: parent
@@ -434,9 +368,7 @@ Item {
         scale: active ? 1 : 0.985
         visible: opacity > 0.01
 
-        Behavior on opacity {
-            NumberAnimation { duration: 135; easing.type: Easing.OutCubic }
-        }
+        Behavior on opacity { NumberAnimation { duration: 135; easing.type: Easing.OutCubic } }
         Behavior on scale {
             NumberAnimation {
                 duration: 180
@@ -482,7 +414,6 @@ Item {
         }
     }
 
-    // ---------- BLUETOOTH CONNECTION EVENT ----------
     Item {
         property bool active: root.displayMode === "bluetooth" && root.expanded
         anchors.fill: parent
@@ -491,9 +422,7 @@ Item {
         visible: opacity > 0.01
         transformOrigin: Item.Top
 
-        Behavior on opacity {
-            NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
-        }
+        Behavior on opacity { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
         Behavior on scale {
             NumberAnimation {
                 duration: 165
@@ -536,8 +465,6 @@ Item {
             }
         }
 
-        // The second row is below the hardware notch, so the full device name
-        // can use the whole popup width without being hidden by the camera cutout.
         Text {
             anchors.left: parent.left
             anchors.leftMargin: 24
