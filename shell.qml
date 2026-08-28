@@ -75,15 +75,18 @@ ShellRoot {
             property bool batteryCriticalPopup:
                 transientMode === "battery" && batteryLevel <= 0.20
 
-            // Media is exposed only while something is actually playing.
+            // Prefer a playing MPRIS player, but keep the first player around
+            // while paused/stopped so pause events can still show its metadata.
             property var activePlayer: {
                 var players = Mpris.players.values
                 for (var i = 0; i < players.length; ++i) {
                     if (players[i].isPlaying)
                         return players[i]
                 }
-                return null
+                return players.length > 0 ? players[0] : null
             }
+            property bool musicSessionAvailable: activePlayer !== null &&
+                ((activePlayer.trackTitle || "") !== "" || activePlayer.canControl)
             property bool musicPlaying: activePlayer !== null && activePlayer.isPlaying
             property string musicTitle: activePlayer
                 ? (activePlayer.trackTitle || activePlayer.identity || "Now Playing")
@@ -107,13 +110,15 @@ ShellRoot {
                 : 0
 
             // A change to any important track identity field counts as a new
-            // song event. MPRIS players often update these fields separately,
-            // so repeated changes simply restart the same short popup timer.
-            property string musicEventKey: musicPlaying
+            // song event. Pausing does not clear this key, so pause/resume is a
+            // separate playback-state event instead of a fake track change.
+            property string musicEventKey: musicSessionAvailable
                 ? musicTitle + "\u241f" + musicArtist + "\u241f" + musicArtRaw
                 : ""
             property string lastMusicEventKey: ""
             property bool musicEventInitialized: false
+            property bool playbackStateInitialized: false
+            property bool lastMusicPlaying: false
 
             // Read-only volume and brightness observation.
             property int volumePercent: 0
@@ -174,21 +179,30 @@ ShellRoot {
             height: targetHeight
 
             onMusicPlayingChanged: {
-                if (musicPlaying) {
-                    musicEventInitialized = true
-                    lastMusicEventKey = musicEventKey
-                    refreshArtwork()
-                    showTransient("music", 2600)
-                } else {
-                    musicEventInitialized = false
-                    lastMusicEventKey = ""
-                    if (selectedMode === "music")
-                        selectedMode = "normal"
-                    if (transientMode === "music") {
-                        transientTimer.stop()
-                        transientMode = ""
+                if (!playbackStateInitialized) {
+                    playbackStateInitialized = true
+                    lastMusicPlaying = musicPlaying
+                    if (musicPlaying && musicSessionAvailable) {
+                        musicEventInitialized = true
+                        lastMusicEventKey = musicEventKey
+                        refreshArtwork()
+                        showTransient("music", 2600)
                     }
+                    return
                 }
+
+                var wasPlaying = lastMusicPlaying
+                lastMusicPlaying = musicPlaying
+
+                if (musicPlaying !== wasPlaying && musicSessionAvailable) {
+                    refreshArtwork()
+                    // Resume gets the normal new-track duration; pause/stop is
+                    // slightly shorter but still long enough to read the state.
+                    showTransient("music", musicPlaying ? 2600 : 2200)
+                }
+
+                if (!musicPlaying && selectedMode === "music")
+                    selectedMode = "normal"
             }
 
             onMusicEventKeyChanged: {
@@ -769,7 +783,8 @@ ShellRoot {
                 // ---------- MUSIC ----------
                 Item {
                     id: musicMode
-                    property bool active: island.displayMode === "music" && island.musicPlaying && island.expanded
+                    property bool active: island.displayMode === "music" &&
+                        island.musicSessionAvailable && island.expanded
                     anchors.fill: parent
                     opacity: active ? 1 : 0
                     scale: active ? 1 : 0.972
@@ -840,8 +855,10 @@ ShellRoot {
                             top: parent.top
                             topMargin: 17
                         }
-                        text: island.formatTime(island.musicPosition) + " / " + island.formatTime(island.musicLength)
-                        color: "#8e8e93"
+                        text: island.musicPlaying
+                            ? island.formatTime(island.musicPosition) + " / " + island.formatTime(island.musicLength)
+                            : "Paused · " + island.formatTime(island.musicPosition) + " / " + island.formatTime(island.musicLength)
+                        color: island.musicPlaying ? "#8e8e93" : "#b8b8bd"
                         font.pixelSize: 12
                         font.weight: Font.Medium
                     }
