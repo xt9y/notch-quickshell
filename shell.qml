@@ -13,14 +13,15 @@ ShellRoot {
             ? Screen.devicePixelRatio
             : 1.0
         property real designToLogical: 1.0 / displayScale
+        property real uiScale: 2.0
 
         anchors.top: true
         anchors.left: true
         anchors.right: true
         color: "transparent"
-        implicitHeight: Math.ceil(380 * designToLogical)
+        implicitHeight: Math.ceil(380 * designToLogical * uiScale)
         exclusionMode: ExclusionMode.Normal
-        exclusiveZone: Math.max(1, Math.round(49 * designToLogical))
+        exclusiveZone: Math.max(1, Math.round(49 * designToLogical * uiScale))
         mask: Region { item: island }
 
         SystemClock {
@@ -31,11 +32,10 @@ ShellRoot {
         Item {
             id: island
 
-            // All dimensions below are physical design pixels. The outer item
-            // converts them to logical KDE/Wayland coordinates using the active
-            // screen's device-pixel ratio, so the software notch stays matched
-            // to the MacBook hardware notch at any Plasma scale.
-            property real unit: panel.designToLogical
+            // All dimensions below are physical design pixels. The entire
+            // design surface is globally zoomed by uiScale, then converted to
+            // logical KDE/Wayland coordinates using the active screen DPR.
+            property real unit: panel.designToLogical * panel.uiScale
             property int notchWidth: 170
             property int collapsedVisualHeight: 44
             property int normalHeight: 48
