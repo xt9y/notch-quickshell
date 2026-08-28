@@ -33,9 +33,10 @@ local mainMod = "SUPER"
 ---- AUTOSTART ----
 -------------------
 
--- Start the notch shell automatically whenever a Hyprland session starts.
+-- Start the notch shell fully detached so it never leaves a terminal-like
+-- helper window around just to keep the Quickshell process alive.
 hl.on("hyprland.start", function()
-    hl.exec_cmd("qs -c notch")
+    hl.exec_cmd("setsid -f qs -c notch >/dev/null 2>&1")
 end)
 
 -------------------------------
