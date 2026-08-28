@@ -481,8 +481,12 @@ ShellRoot {
                 }
             }
 
+            // Fast baseline polling makes the first hardware-key press appear
+            // quickly. While the matching popup is visible, switch into a
+            // short live cadence so repeated key presses track nearly instantly.
             Timer {
-                interval: 500
+                id: volumePollTimer
+                interval: island.displayMode === "volume" ? 45 : 120
                 repeat: true
                 running: true
                 triggeredOnStart: true
@@ -498,7 +502,8 @@ ShellRoot {
             }
 
             Timer {
-                interval: 600
+                id: brightnessPollTimer
+                interval: island.displayMode === "brightness" ? 60 : 140
                 repeat: true
                 running: true
                 triggeredOnStart: true
@@ -509,7 +514,7 @@ ShellRoot {
                 id: brightnessProbe
                 command: [
                     "bash", "-lc",
-                    "cur=$(brightnessctl g 2>/dev/null) || exit 0; max=$(brightnessctl m 2>/dev/null) || exit 0; [ \"$max\" -gt 0 ] && echo $((cur * 100 / max))"
+                    "brightnessctl -m 2>/dev/null | head -n1 | cut -d, -f4 | tr -d '%'"
                 ]
                 stdout: StdioCollector {
                     onStreamFinished: island.consumeBrightness(text)
@@ -1086,8 +1091,8 @@ ShellRoot {
                     scale: active ? 1 : 0.985
                     visible: opacity > 0.01
                     enabled: active
-                    Behavior on opacity { NumberAnimation { duration: 135; easing.type: Easing.OutCubic } }
-                    Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutBack; easing.overshoot: 0.35 } }
+                    Behavior on opacity { NumberAnimation { duration: 105; easing.type: Easing.OutCubic } }
+                    Behavior on scale { NumberAnimation { duration: 145; easing.type: Easing.OutBack; easing.overshoot: 0.28 } }
 
                     Text {
                         anchors { left: parent.left; leftMargin: 24; top: parent.top; topMargin: 15 }
@@ -1108,7 +1113,7 @@ ShellRoot {
                             height: parent.height
                             radius: parent.radius
                             color: "#f2f2f7"
-                            Behavior on width { NumberAnimation { duration: 170; easing.type: Easing.OutCubic } }
+                            Behavior on width { NumberAnimation { duration: 55; easing.type: Easing.OutCubic } }
                         }
                     }
 
@@ -1130,8 +1135,8 @@ ShellRoot {
                     scale: active ? 1 : 0.985
                     visible: opacity > 0.01
                     enabled: active
-                    Behavior on opacity { NumberAnimation { duration: 135; easing.type: Easing.OutCubic } }
-                    Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutBack; easing.overshoot: 0.35 } }
+                    Behavior on opacity { NumberAnimation { duration: 105; easing.type: Easing.OutCubic } }
+                    Behavior on scale { NumberAnimation { duration: 145; easing.type: Easing.OutBack; easing.overshoot: 0.28 } }
 
                     Text {
                         anchors { left: parent.left; leftMargin: 24; top: parent.top; topMargin: 13 }
@@ -1151,7 +1156,7 @@ ShellRoot {
                             height: parent.height
                             radius: parent.radius
                             color: "#f2f2f7"
-                            Behavior on width { NumberAnimation { duration: 170; easing.type: Easing.OutCubic } }
+                            Behavior on width { NumberAnimation { duration: 60; easing.type: Easing.OutCubic } }
                         }
                     }
 
