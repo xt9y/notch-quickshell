@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Shapes
 import Quickshell
 import Quickshell.Services.UPower
 
@@ -32,15 +33,14 @@ ShellRoot {
         Item {
             id: island
 
-            // The software notch permanently surrounds the physical MacBook
-            // notch. Keeping the black surface visible at all times makes the
-            // hardware cutout visually disappear into one continuous shape.
             property int notchWidth: 170
             property int notchHeight: 48
+            property int collapsedVisualHeight: 46
             property int expandedWidth: 540
             property int cornerRadius: 13
             property bool expanded: hover.hovered
             property real wingWidth: (width - notchWidth) / 2
+            property real visualHeight: expanded ? notchHeight : collapsedVisualHeight
 
             property var battery: UPower.displayDevice
             property real batteryLevel: battery && battery.ready
@@ -70,24 +70,63 @@ ShellRoot {
                 id: hover
             }
 
-            // Rounded lower corners.
-            Rectangle {
-                anchors.fill: parent
-                radius: island.cornerRadius
-                color: "#000000"
-            }
+            // One exact notch silhouette: perfectly square along the display
+            // edge, a flat bottom, and only the two lower corners rounded.
+            // The collapsed silhouette ends 2px higher to eliminate the tiny
+            // black lip that was visible below the physical notch.
+            Shape {
+                id: notchShape
 
-            // Square off the top so the software surface connects seamlessly
-            // with the physical notch and the top display bezel.
-            Rectangle {
                 anchors {
                     top: parent.top
                     left: parent.left
                     right: parent.right
                 }
 
-                height: island.cornerRadius
-                color: "#000000"
+                height: island.visualHeight
+                antialiasing: true
+
+                ShapePath {
+                    strokeWidth: -1
+                    fillColor: "#000000"
+
+                    startX: 0
+                    startY: 0
+
+                    PathLine {
+                        x: notchShape.width
+                        y: 0
+                    }
+
+                    PathLine {
+                        x: notchShape.width
+                        y: notchShape.height - island.cornerRadius
+                    }
+
+                    PathQuad {
+                        x: notchShape.width - island.cornerRadius
+                        y: notchShape.height
+                        controlX: notchShape.width
+                        controlY: notchShape.height
+                    }
+
+                    PathLine {
+                        x: island.cornerRadius
+                        y: notchShape.height
+                    }
+
+                    PathQuad {
+                        x: 0
+                        y: notchShape.height - island.cornerRadius
+                        controlX: 0
+                        controlY: notchShape.height
+                    }
+
+                    PathLine {
+                        x: 0
+                        y: 0
+                    }
+                }
             }
 
             Item {
@@ -95,11 +134,11 @@ ShellRoot {
 
                 anchors {
                     left: parent.left
-                    verticalCenter: parent.verticalCenter
+                    verticalCenter: notchShape.verticalCenter
                 }
 
                 width: island.wingWidth
-                height: parent.height
+                height: notchShape.height
                 opacity: island.expanded ? 1 : 0
 
                 Behavior on opacity {
@@ -214,7 +253,7 @@ ShellRoot {
                 anchors {
                     right: parent.right
                     rightMargin: 24
-                    verticalCenter: parent.verticalCenter
+                    verticalCenter: notchShape.verticalCenter
                 }
 
                 width: implicitWidth
@@ -239,6 +278,13 @@ ShellRoot {
                     duration: 220
                     easing.type: Easing.OutBack
                     easing.overshoot: 1.15
+                }
+            }
+
+            Behavior on visualHeight {
+                NumberAnimation {
+                    duration: 160
+                    easing.type: Easing.OutCubic
                 }
             }
         }
