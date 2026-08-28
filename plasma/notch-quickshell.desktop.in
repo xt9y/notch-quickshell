@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Notch Quickshell
+Comment=Start and update the M2 notch Quickshell widget
+Exec=/usr/bin/bash __HOME__/.config/quickshell/notch/scripts/config-update.sh __HOME__/.config/quickshell/notch
+Terminal=false
+StartupNotify=false
+OnlyShowIn=KDE;
