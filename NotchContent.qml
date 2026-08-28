@@ -30,7 +30,31 @@ Item {
 
     property int volumePercent: 0
     property bool volumeMuted: false
+    property int previousVolumePercent: -1
+    property bool previousVolumeMuted: false
+    property string volumeAction: "up"
+    property string volumeSymbol: volumeMuted || volumeAction === "mute"
+        ? "🔇"
+        : volumeAction === "down" ? "🔉" : "🔊"
     property int brightnessPercent: 0
+
+    onVolumePercentChanged: {
+        if (previousVolumePercent >= 0) {
+            if (volumePercent > previousVolumePercent)
+                volumeAction = "up"
+            else if (volumePercent < previousVolumePercent)
+                volumeAction = "down"
+        }
+        previousVolumePercent = volumePercent
+    }
+
+    onVolumeMutedChanged: {
+        if (volumeMuted)
+            volumeAction = "mute"
+        else if (previousVolumeMuted)
+            volumeAction = volumePercent > 0 ? "up" : "down"
+        previousVolumeMuted = volumeMuted
+    }
 
     property bool wifiEnabled: false
     property string wifiSsid: ""
@@ -285,9 +309,9 @@ Item {
                 anchors.left: parent.left
                 anchors.leftMargin: 24
                 anchors.verticalCenter: parent.verticalCenter
-                text: root.volumeMuted ? "Muted" : "Volume"
+                text: root.volumeSymbol
                 color: "white"
-                font.pixelSize: 15
+                font.pixelSize: 18
                 font.weight: Font.Medium
             }
         }
