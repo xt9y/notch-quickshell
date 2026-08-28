@@ -39,6 +39,12 @@ Item {
         return mins + ":" + (secs < 10 ? "0" : "") + secs
     }
 
+    ArtworkSource {
+        id: artworkSource
+        player: root.player
+        preferredSource: root.artSource
+    }
+
     Row {
         anchors.left: parent.left
         anchors.leftMargin: 24
@@ -120,7 +126,7 @@ Item {
         Image {
             id: artImage
             anchors.fill: parent
-            source: root.artSource
+            source: artworkSource.resolvedSource
             fillMode: Image.PreserveAspectCrop
             asynchronous: true
             cache: true
@@ -134,9 +140,6 @@ Item {
             }
         }
 
-        // QtQuick Image is rectangular. These four filled corner masks remove
-        // the image outside the rounded silhouette instead of merely drawing a
-        // thin rounded outline on top of it.
         Shape {
             anchors.fill: parent
             antialiasing: true
