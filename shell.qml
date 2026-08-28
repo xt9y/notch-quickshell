@@ -13,13 +13,12 @@ ShellRoot {
         }
 
         color: "transparent"
-        implicitHeight: 36
+        implicitHeight: 48
 
-        // Reserve the notch clearance directly through Wayland layer-shell.
-        // KWin respects this like a panel strut, so no compositor-specific
-        // monitor reservation is needed.
+        // Reserve the enlarged notch clearance directly through Wayland
+        // layer-shell so Plasma/KWin keeps normal windows below it.
         exclusionMode: ExclusionMode.Normal
-        exclusiveZone: 37
+        exclusiveZone: 49
 
         mask: Region {
             item: island
@@ -33,19 +32,15 @@ ShellRoot {
         Item {
             id: island
 
-            // The complete notch UI is scaled up by roughly 25% while keeping
-            // the same proportions and interaction model.
-            property int notchWidth: 123
-            property int notchHeight: 36
-            property int expandedWidth: 444
-            property int cornerRadius: 10
+            // The software notch permanently surrounds the physical MacBook
+            // notch. Keeping the black surface visible at all times makes the
+            // hardware cutout visually disappear into one continuous shape.
+            property int notchWidth: 170
+            property int notchHeight: 48
+            property int expandedWidth: 540
+            property int cornerRadius: 13
             property bool expanded: hover.hovered
             property real wingWidth: (width - notchWidth) / 2
-
-            // In the idle state, rely entirely on the physical M2 notch. Keep
-            // the software surface alive while the width animation contracts,
-            // then remove it completely once we are fully collapsed.
-            property bool surfaceVisible: expanded || width > notchWidth + 0.5
 
             property var battery: UPower.displayDevice
             property real batteryLevel: battery && battery.ready
@@ -75,13 +70,15 @@ ShellRoot {
                 id: hover
             }
 
+            // Rounded lower corners.
             Rectangle {
                 anchors.fill: parent
                 radius: island.cornerRadius
                 color: "#000000"
-                visible: island.surfaceVisible
             }
 
+            // Square off the top so the software surface connects seamlessly
+            // with the physical notch and the top display bezel.
             Rectangle {
                 anchors {
                     top: parent.top
@@ -91,7 +88,6 @@ ShellRoot {
 
                 height: island.cornerRadius
                 color: "#000000"
-                visible: island.surfaceVisible
             }
 
             Item {
@@ -118,14 +114,14 @@ ShellRoot {
 
                     anchors {
                         left: parent.left
-                        leftMargin: 20
+                        leftMargin: 24
                         verticalCenter: parent.verticalCenter
                     }
 
                     width: implicitWidth
                     text: Qt.formatDateTime(clock.date, "HH:mm")
                     color: "white"
-                    font.pixelSize: 15
+                    font.pixelSize: 17
                     font.weight: Font.Medium
                     horizontalAlignment: Text.AlignLeft
                     verticalAlignment: Text.AlignVCenter
@@ -136,12 +132,12 @@ ShellRoot {
 
                     anchors {
                         left: timeText.right
-                        leftMargin: 9
+                        leftMargin: 10
                         verticalCenter: parent.verticalCenter
                     }
 
-                    width: island.batteryCharging ? 43 : 31
-                    height: 15
+                    width: island.batteryCharging ? 48 : 36
+                    height: 18
                     visible: island.battery && island.battery.ready
 
                     Rectangle {
@@ -152,9 +148,9 @@ ShellRoot {
                             verticalCenter: parent.verticalCenter
                         }
 
-                        width: 26
-                        height: 13
-                        radius: 3
+                        width: 30
+                        height: 15
+                        radius: 3.5
                         color: "transparent"
                         border.width: 1
                         border.color: "#d1d1d6"
@@ -170,7 +166,7 @@ ShellRoot {
                             }
 
                             width: Math.max(0, (batteryBody.width - 6) * island.batteryLevel)
-                            radius: 1.5
+                            radius: 1.7
                             color: island.batteryColor
 
                             Behavior on width {
@@ -192,7 +188,7 @@ ShellRoot {
                         }
 
                         width: 3
-                        height: 6
+                        height: 7
                         radius: 1.5
                         color: "#d1d1d6"
                     }
@@ -207,7 +203,7 @@ ShellRoot {
                         visible: island.batteryCharging
                         text: "⚡"
                         color: "white"
-                        font.pixelSize: 14
+                        font.pixelSize: 16
                         font.weight: Font.Medium
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -217,14 +213,14 @@ ShellRoot {
             Text {
                 anchors {
                     right: parent.right
-                    rightMargin: 20
+                    rightMargin: 24
                     verticalCenter: parent.verticalCenter
                 }
 
                 width: implicitWidth
                 text: Qt.formatDateTime(clock.date, "ddd, d MMM")
                 color: "#b8b8bd"
-                font.pixelSize: 15
+                font.pixelSize: 17
                 font.weight: Font.Medium
                 horizontalAlignment: Text.AlignRight
                 verticalAlignment: Text.AlignVCenter
