@@ -23,6 +23,8 @@ ShellRoot {
         exclusionMode: ExclusionMode.Normal
         exclusiveZone: Math.max(1, Math.round(49 * designToLogical * uiScale))
         mask: Region { item: island }
+        focusable: island.displayMode === "weatherPanel" ||
+            island.displayMode === "wifiPanel"
 
         SystemClock {
             id: clock
