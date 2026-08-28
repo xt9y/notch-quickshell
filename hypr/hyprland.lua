@@ -32,10 +32,11 @@ local mainMod = "SUPER"
 ---- AUTOSTART ----
 -------------------
 
--- Start the notch shell fully detached so it never leaves a terminal-like
--- helper window around just to keep the Quickshell process alive.
+-- Run the same update path used by the config-update shell alias on every
+-- Hyprland login: pull the repo, then launch the notch Quickshell config.
+-- Detach it so startup never leaves a terminal/helper window behind.
 hl.on("hyprland.start", function()
-    hl.exec_cmd("setsid -f qs -c notch >/dev/null 2>&1")
+    hl.exec_cmd("setsid -f bash $HOME/.config/quickshell/notch/scripts/config-update.sh $HOME/.config/quickshell/notch >/dev/null 2>&1")
 end)
 
 -------------------------------
