@@ -216,6 +216,8 @@ ShellRoot {
                     return connectivityLeftWingTarget
                 if (displayMode === "bluetooth")
                     return bluetoothEventWingTarget
+                if (displayMode === "battery")
+                    return 190
                 return symmetricWing(displayMode)
             }
 
@@ -226,6 +228,8 @@ ShellRoot {
                     return connectivityRightWingTarget
                 if (displayMode === "bluetooth")
                     return bluetoothEventWingTarget
+                if (displayMode === "battery")
+                    return symmetricWing("battery")
                 return symmetricWing(displayMode)
             }
 
@@ -877,6 +881,11 @@ ShellRoot {
                     batteryColor: island.batteryColor
                     batteryShellColor: island.batteryShellColor
                     onSettingsRequested: island.openSettings()
+                    onCalendarRequested: {
+                        transientTimer.stop()
+                        island.transientMode = ""
+                        island.selectedMode = "calendarPanel"
+                    }
                 }
 
                 SettingsPanel {
