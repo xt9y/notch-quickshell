@@ -32,9 +32,6 @@ ShellRoot {
         Item {
             id: island
 
-            // All dimensions below are physical design pixels. The entire
-            // design surface is globally zoomed by uiScale, then converted to
-            // logical KDE/Wayland coordinates using the active screen DPR.
             property real unit: panel.designToLogical * panel.uiScale
             property int notchWidth: 170
             property int collapsedVisualHeight: 44
@@ -50,7 +47,6 @@ ShellRoot {
             property bool hoverHold: false
             property bool expanded: hover.hovered || hoverHold || transientMode !== ""
 
-            // ---------- BATTERY ----------
             property var battery: UPower.displayDevice
             property real batteryLevel: battery && battery.ready
                 ? Math.max(0, Math.min(1, battery.percentage))
@@ -72,7 +68,6 @@ ShellRoot {
             property int lastBatteryPercent: -1
             property string batteryEventText: "Battery"
 
-            // ---------- MEDIA ----------
             property var activePlayer: {
                 var players = Mpris.players.values
                 for (var i = 0; i < players.length; ++i) {
@@ -110,7 +105,6 @@ ShellRoot {
             property bool playbackStateInitialized: false
             property bool lastMusicPlaying: false
 
-            // ---------- VOLUME / BRIGHTNESS ----------
             property int volumePercent: 0
             property bool volumeMuted: false
             property int lastVolumePercent: -1
@@ -119,7 +113,6 @@ ShellRoot {
             property int brightnessPercent: 0
             property int lastBrightnessPercent: -1
 
-            // ---------- CONNECTIVITY ----------
             property bool wifiAvailable: false
             property bool wifiEnabled: false
             property string wifiSsid: ""
@@ -157,14 +150,14 @@ ShellRoot {
                 Math.max(170, Math.min(520, bluetoothLabelMetrics.advanceWidth + 66))
             property real bluetoothEventRightWingTarget:
                 Math.max(180, Math.min(520, bluetoothEventMetrics.advanceWidth + 70))
+            property real bluetoothEventWingTarget:
+                Math.max(145, bluetoothEventRightWingTarget)
 
             function modeWidth(mode) {
                 if (mode === "music")
                     return 570
-                if (mode === "wifiPanel" || mode === "bluetoothPanel")
+                if (mode === "wifiPanel" || mode === "bluetoothPanel" || mode === "soundPanel")
                     return 540
-                // Slightly roomier than the ultra-tight 330 px version while
-                // still hugging the hardware notch closely.
                 if (mode === "volume" || mode === "brightness")
                     return 370
                 if (mode === "battery")
@@ -175,7 +168,7 @@ ShellRoot {
             function modeHeight(mode) {
                 if (mode === "music")
                     return musicHeight
-                if (mode === "wifiPanel" || mode === "bluetoothPanel")
+                if (mode === "wifiPanel" || mode === "bluetoothPanel" || mode === "soundPanel")
                     return detailHeight
                 if (mode === "bluetooth")
                     return bluetoothEventHeight
@@ -192,7 +185,7 @@ ShellRoot {
                 if (displayMode === "connectivity")
                     return connectivityLeftWingTarget
                 if (displayMode === "bluetooth")
-                    return 145
+                    return bluetoothEventWingTarget
                 return symmetricWing(displayMode)
             }
 
@@ -202,18 +195,15 @@ ShellRoot {
                 if (displayMode === "connectivity")
                     return connectivityRightWingTarget
                 if (displayMode === "bluetooth")
-                    return bluetoothEventRightWingTarget
+                    return bluetoothEventWingTarget
                 return symmetricWing(displayMode)
             }
 
-            // targetWidth/Height and centerOffset stay in physical design pixels.
             property real targetWidth: notchWidth + targetLeftWing + targetRightWing
             property real targetHeight: expanded ? modeHeight(displayMode) : collapsedVisualHeight
             property real targetCenterOffset: (targetRightWing - targetLeftWing) / 2
             property real centerOffset: expanded ? targetCenterOffset : 0
 
-            // The actual outer item is in logical pixels. Convert its animated
-            // size back to design coordinates for all internal wing layout.
             property real designWidth: unit > 0 ? width / unit : width
             property real designHeight: unit > 0 ? height / unit : height
             property real actualLeftWing:
@@ -245,6 +235,8 @@ ShellRoot {
                     selectedMode = musicPlaying ? "music" : "connectivity"
                 else if (selectedMode === "music")
                     selectedMode = "connectivity"
+                else if (selectedMode === "connectivity")
+                    selectedMode = "soundPanel"
                 else
                     selectedMode = "normal"
             }
@@ -255,7 +247,6 @@ ShellRoot {
                 selectedMode = kind === "bluetooth" ? "bluetoothPanel" : "wifiPanel"
             }
 
-            // ---------- MEDIA EVENTS ----------
             onMusicPlayingChanged: {
                 if (!playbackStateInitialized) {
                     playbackStateInitialized = true
@@ -336,7 +327,6 @@ ShellRoot {
                 artFetch.running = true
             }
 
-            // ---------- OBSERVERS ----------
             function consumeVolume(raw) {
                 var match = raw.match(/Volume:\s*([0-9.]+)/)
                 if (!match) {
@@ -580,10 +570,6 @@ ShellRoot {
                 }
             }
 
-            // setup.sh's managed Volume Up/Down launchers update this file for
-            // every key-repeat event. This makes the popup event-driven instead
-            // of relying solely on polling and also restarts its timeout while
-            // the user is holding a volume key.
             FileView {
                 id: volumeEventWatcher
                 path: {
@@ -699,9 +685,6 @@ ShellRoot {
                 }
             }
 
-            // The visual surface remains in physical design coordinates and is
-            // uniformly scaled into the logical outer item. This also scales all
-            // text, radii, artwork, and detail panels consistently.
             Item {
                 id: designSurface
                 width: island.designWidth
@@ -785,6 +768,8 @@ ShellRoot {
                     onBluetoothPanelRequested: island.openConnectivity("bluetooth")
                     onDetailBackRequested: island.selectedMode = "connectivity"
                     onStatusRefreshRequested: {
+                        if (!volumeProbe.running)
+                            volumeProbe.running = true
                         if (!wifiProbe.running)
                             wifiProbe.running = true
                         if (!bluetoothProbe.running)
