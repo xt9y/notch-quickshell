@@ -19,9 +19,7 @@ Item {
     enabled: active
     transformOrigin: Item.Top
 
-    Behavior on opacity {
-        NumberAnimation { duration: 115; easing.type: Easing.OutCubic }
-    }
+    Behavior on opacity { NumberAnimation { duration: 115; easing.type: Easing.OutCubic } }
     Behavior on scale {
         NumberAnimation {
             duration: 165
@@ -46,38 +44,53 @@ Item {
     }
 
     Row {
-        anchors.left: parent.left
-        anchors.leftMargin: 24
+        anchors.horizontalCenter: albumArt.horizontalCenter
         anchors.top: parent.top
-        anchors.topMargin: 12
-        spacing: 17
+        anchors.topMargin: 11
+        spacing: 9
 
-        Text {
-            text: "‹"
-            color: root.player && root.player.canGoPrevious ? "white" : "#55555a"
-            font.pixelSize: 25
+        Item {
+            width: 22
+            height: 28
+            Text {
+                anchors.centerIn: parent
+                text: "‹"
+                color: root.player && root.player.canGoPrevious ? "white" : "#55555a"
+                font.pixelSize: 25
+            }
             MouseArea {
                 anchors.fill: parent
                 enabled: root.player && root.player.canGoPrevious
                 onClicked: root.player.previous()
             }
         }
-        Text {
-            text: root.playing ? "Ⅱ" : "▶"
-            color: root.player && root.player.canTogglePlaying ? "white" : "#55555a"
-            font.pixelSize: root.playing ? 16 : 15
-            font.weight: Font.Medium
-            anchors.verticalCenter: parent.verticalCenter
+
+        Item {
+            width: 22
+            height: 28
+            Text {
+                anchors.centerIn: parent
+                text: root.playing ? "Ⅱ" : "▶"
+                color: root.player && root.player.canTogglePlaying ? "white" : "#55555a"
+                font.pixelSize: root.playing ? 16 : 15
+                font.weight: Font.Medium
+            }
             MouseArea {
                 anchors.fill: parent
                 enabled: root.player && root.player.canTogglePlaying
                 onClicked: root.player.togglePlaying()
             }
         }
-        Text {
-            text: "›"
-            color: root.player && root.player.canGoNext ? "white" : "#55555a"
-            font.pixelSize: 25
+
+        Item {
+            width: 22
+            height: 28
+            Text {
+                anchors.centerIn: parent
+                text: "›"
+                color: root.player && root.player.canGoNext ? "white" : "#55555a"
+                font.pixelSize: 25
+            }
             MouseArea {
                 anchors.fill: parent
                 enabled: root.player && root.player.canGoNext
@@ -102,7 +115,6 @@ Item {
     Item {
         id: albumArt
         property real artRadius: 14
-
         anchors.left: parent.left
         anchors.leftMargin: 24
         anchors.top: parent.top
@@ -135,27 +147,19 @@ Item {
             sourceSize.width: 160
             sourceSize.height: 160
             opacity: status === Image.Ready ? 1 : 0
-            Behavior on opacity {
-                NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
-            }
+            Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
         }
 
         Shape {
             anchors.fill: parent
             antialiasing: true
-
             ShapePath {
                 strokeWidth: -1
                 fillColor: "#000000"
                 startX: 0
                 startY: 0
                 PathLine { x: albumArt.artRadius; y: 0 }
-                PathQuad {
-                    x: 0
-                    y: albumArt.artRadius
-                    controlX: 0
-                    controlY: 0
-                }
+                PathQuad { x: 0; y: albumArt.artRadius; controlX: 0; controlY: 0 }
                 PathLine { x: 0; y: 0 }
             }
             ShapePath {
@@ -164,12 +168,7 @@ Item {
                 startX: albumArt.width
                 startY: 0
                 PathLine { x: albumArt.width - albumArt.artRadius; y: 0 }
-                PathQuad {
-                    x: albumArt.width
-                    y: albumArt.artRadius
-                    controlX: albumArt.width
-                    controlY: 0
-                }
+                PathQuad { x: albumArt.width; y: albumArt.artRadius; controlX: albumArt.width; controlY: 0 }
                 PathLine { x: albumArt.width; y: 0 }
             }
             ShapePath {
@@ -178,12 +177,7 @@ Item {
                 startX: 0
                 startY: albumArt.height
                 PathLine { x: 0; y: albumArt.height - albumArt.artRadius }
-                PathQuad {
-                    x: albumArt.artRadius
-                    y: albumArt.height
-                    controlX: 0
-                    controlY: albumArt.height
-                }
+                PathQuad { x: albumArt.artRadius; y: albumArt.height; controlX: 0; controlY: albumArt.height }
                 PathLine { x: 0; y: albumArt.height }
             }
             ShapePath {
@@ -192,12 +186,7 @@ Item {
                 startX: albumArt.width
                 startY: albumArt.height
                 PathLine { x: albumArt.width; y: albumArt.height - albumArt.artRadius }
-                PathQuad {
-                    x: albumArt.width - albumArt.artRadius
-                    y: albumArt.height
-                    controlX: albumArt.width
-                    controlY: albumArt.height
-                }
+                PathQuad { x: albumArt.width - albumArt.artRadius; y: albumArt.height; controlX: albumArt.width; controlY: albumArt.height }
                 PathLine { x: albumArt.width; y: albumArt.height }
             }
         }
@@ -249,9 +238,7 @@ Item {
                 height: parent.height
                 radius: parent.radius
                 color: "#f2f2f7"
-                Behavior on width {
-                    NumberAnimation { duration: 180; easing.type: Easing.Linear }
-                }
+                Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.Linear } }
             }
         }
     }
