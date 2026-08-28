@@ -56,9 +56,10 @@ Item {
             height: 28
             Text {
                 anchors.centerIn: parent
-                text: "‹"
+                text: "<<"
                 color: root.player && root.player.canGoPrevious ? "white" : "#55555a"
-                font.pixelSize: 25
+                font.pixelSize: 14
+                font.weight: Font.Medium
             }
             MouseArea {
                 anchors.fill: parent
@@ -73,10 +74,10 @@ Item {
             Text {
                 anchors.centerIn: parent
                 anchors.verticalCenterOffset: 2
-                text: root.playing ? "Ⅱ" : "▶"
+                text: root.playing ? "||" : ">"
                 color: root.player && root.player.canTogglePlaying ? "white" : "#55555a"
-                font.pixelSize: root.playing ? 14 : 13
-                font.weight: Font.Medium
+                font.pixelSize: root.playing ? 12 : 14
+                font.weight: Font.DemiBold
             }
             MouseArea {
                 anchors.fill: parent
@@ -90,9 +91,10 @@ Item {
             height: 28
             Text {
                 anchors.centerIn: parent
-                text: "›"
+                text: ">>"
                 color: root.player && root.player.canGoNext ? "white" : "#55555a"
-                font.pixelSize: 25
+                font.pixelSize: 14
+                font.weight: Font.Medium
             }
             MouseArea {
                 anchors.fill: parent
@@ -109,7 +111,7 @@ Item {
         anchors.topMargin: 17
         text: root.playing
             ? root.timeText(root.position) + " / " + root.timeText(root.length)
-            : "Paused · " + root.timeText(root.position) + " / " + root.timeText(root.length)
+            : "Paused - " + root.timeText(root.position) + " / " + root.timeText(root.length)
         color: root.playing ? "#8e8e93" : "#b8b8bd"
         font.pixelSize: 12
         font.weight: Font.Medium
@@ -133,9 +135,10 @@ Item {
             Text {
                 anchors.centerIn: parent
                 visible: artImage.status !== Image.Ready
-                text: "♪"
+                text: "M"
                 color: "#636366"
-                font.pixelSize: 25
+                font.pixelSize: 18
+                font.weight: Font.DemiBold
             }
         }
 
