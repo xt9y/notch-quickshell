@@ -246,15 +246,4 @@ Item {
             }
         }
     }
-
-    Text {
-        anchors.left: parent.left
-        anchors.leftMargin: 24
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 16
-        text: Qt.formatDate(root.today, "dddd, d MMMM yyyy")
-        color: "#636366"
-        font.pixelSize: 11
-        font.weight: Font.Medium
-    }
 }
