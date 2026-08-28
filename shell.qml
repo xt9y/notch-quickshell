@@ -83,9 +83,7 @@ ShellRoot {
                 ? activePlayer.trackArtUrl.toString()
                 : ""
             property string cachedMusicArtUrl: ""
-            property url musicArtSource: cachedMusicArtUrl !== ""
-                ? cachedMusicArtUrl
-                : normalizeArtUrl(musicArtRaw)
+            property url musicArtSource: cachedMusicArtUrl
             property real musicPosition: 0
             property real musicLength: activePlayer && activePlayer.lengthSupported
                 ? Math.max(0, activePlayer.length)
@@ -149,22 +147,13 @@ ShellRoot {
             property real bluetoothEventRightWingTarget:
                 Math.max(180, Math.min(520, bluetoothEventMetrics.advanceWidth + 70))
 
-            function normalizeArtUrl(raw) {
-                if (!raw)
-                    return ""
-                var value = raw.toString()
-                if (value === "")
-                    return ""
-                return value.charAt(0) === "/" ? "file://" + value : value
-            }
-
             function modeWidth(mode) {
                 if (mode === "music")
                     return 530
                 if (mode === "wifiPanel" || mode === "bluetoothPanel")
                     return 540
                 if (mode === "volume" || mode === "brightness")
-                    return 410
+                    return 480
                 if (mode === "battery")
                     return 420
                 return 540
@@ -286,6 +275,7 @@ ShellRoot {
 
                 if (musicEventKey !== lastMusicEventKey) {
                     lastMusicEventKey = musicEventKey
+                    refreshArtwork()
                     showTransient("music", 2600)
                 }
             }
@@ -298,13 +288,29 @@ ShellRoot {
                     artFetch.running = false
 
                 var raw = musicArtRaw
-                if (raw.indexOf("http://") !== 0 && raw.indexOf("https://") !== 0)
+                if (raw === "")
                     return
 
                 artFetch.command = [
                     "bash",
                     "-lc",
-                    "set -e; url=\"$1\"; command -v curl >/dev/null 2>&1 || exit 0; dir=\"${XDG_CACHE_HOME:-$HOME/.cache}/notch-quickshell/art\"; mkdir -p \"$dir\"; key=$(printf '%s' \"$url\" | sha256sum | cut -d' ' -f1); out=\"$dir/$key\"; if [ ! -s \"$out\" ]; then tmp=\"$out.tmp.$$\"; curl -LfsS --max-time 8 \"$url\" -o \"$tmp\" && mv \"$tmp\" \"$out\" || { rm -f \"$tmp\"; exit 0; }; fi; [ -s \"$out\" ] && printf 'file://%s' \"$out\"",
+                    "set -e; " +
+                    "url=\"$1\"; " +
+                    "dir=\"${XDG_CACHE_HOME:-$HOME/.cache}/notch-quickshell/art\"; " +
+                    "mkdir -p \"$dir\"; " +
+                    "key=$(printf '%s' \"$url\" | sha256sum | cut -d' ' -f1); " +
+                    "for ext in jpg jpeg png webp gif bmp avif img; do out=\"$dir/$key.$ext\"; if [ -s \"$out\" ]; then printf 'file://%s' \"$out\"; exit 0; fi; done; " +
+                    "tmp=\"$dir/$key.tmp.$$\"; " +
+                    "case \"$url\" in " +
+                    "http://*|https://*) command -v curl >/dev/null 2>&1 || exit 0; curl -LfsS --max-time 8 \"$url\" -o \"$tmp\" ;; " +
+                    "file://*) src=\"${url#file://}\"; [ -r \"$src\" ] || exit 0; cp -- \"$src\" \"$tmp\" ;; " +
+                    "/*) [ -r \"$url\" ] || exit 0; cp -- \"$url\" \"$tmp\" ;; " +
+                    "*) exit 0 ;; esac; " +
+                    "[ -s \"$tmp\" ] || { rm -f \"$tmp\"; exit 0; }; " +
+                    "mime=$(file -Lb --mime-type \"$tmp\" 2>/dev/null || true); " +
+                    "case \"$mime\" in " +
+                    "image/jpeg) ext=jpg ;; image/png) ext=png ;; image/webp) ext=webp ;; image/gif) ext=gif ;; image/bmp) ext=bmp ;; image/avif) ext=avif ;; image/*) ext=img ;; *) rm -f \"$tmp\"; exit 0 ;; esac; " +
+                    "out=\"$dir/$key.$ext\"; mv -f \"$tmp\" \"$out\"; printf 'file://%s' \"$out\"",
                     "notch-art",
                     raw
                 ]
@@ -476,8 +482,6 @@ ShellRoot {
                 }
             }
 
-            // Keep the physical-notch click target centered even when one wing
-            // grows farther than the other.
             MouseArea {
                 z: 0
                 x: island.actualLeftWing
@@ -557,9 +561,6 @@ ShellRoot {
                 }
             }
 
-            // Bluetooth audio devices can disappear before PipeWire has moved
-            // the default sink back. Repair only that broken default handoff;
-            // volume itself is still controlled exclusively by the hardware keys.
             Process {
                 id: audioRecovery
                 command: [
@@ -708,7 +709,8 @@ ShellRoot {
                 batteryColor: island.batteryColor
                 batteryShellColor: island.batteryShellColor
                 batteryEventText: island.batteryEventText
-                musicPlaying: island.musicPlaying
+                // Never draw the old idle music indicator on a closed notch.
+                musicPlaying: island.expanded && island.musicPlaying
                 musicSessionAvailable: island.musicSessionAvailable
                 activePlayer: island.activePlayer
                 musicTitle: island.musicTitle
