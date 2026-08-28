@@ -42,6 +42,7 @@ Item {
     property string wifiSsid: ""
     property bool bluetoothPowered: false
     property string bluetoothDevice: ""
+    property string connectionEventLabel: "Bluetooth"
     property string bluetoothEventText: "Bluetooth"
     property string detailPanelType: "wifi"
 
@@ -291,9 +292,6 @@ Item {
         onStatusRefreshRequested: root.statusRefreshRequested()
     }
 
-    // Keep the shared back arrow slightly lower than the detail-panel glyph,
-    // but mask only the glyph itself. The old wider mask overlapped the first
-    // pixels of the Wi-Fi/Bluetooth title.
     Rectangle {
         z: 40
         x: 15
@@ -314,8 +312,6 @@ Item {
         }
     }
 
-    // Connected Bluetooth devices are sorted first in ConnectivityPanel. This
-    // action therefore sits beside that row's existing forget button.
     BluetoothRouteButton {
         z: 45
         anchors.right: parent.right
@@ -511,7 +507,7 @@ Item {
                 anchors.left: parent.left
                 anchors.leftMargin: 24
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Bluetooth"
+                text: root.connectionEventLabel
                 color: "#b8b8bd"
                 font.pixelSize: 14
                 font.weight: Font.Medium
@@ -531,7 +527,9 @@ Item {
                 width: 7
                 height: 7
                 radius: 3.5
-                color: root.bluetoothPowered ? "#30d158" : "#636366"
+                color: root.bluetoothEventText.indexOf("disconnected") === -1
+                    ? "#30d158"
+                    : "#636366"
             }
         }
 
