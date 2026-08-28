@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Shapes
+import Quickshell.Io
 
 Item {
     id: root
@@ -12,6 +13,7 @@ Item {
     property real position: 0
     property real length: 0
     property real progress: 0
+    property int volumeValue: 0
 
     opacity: active ? 1 : 0
     scale: active ? 1 : 0.972
@@ -41,67 +43,46 @@ Item {
         return mins + ":" + (secs < 10 ? "0" : "") + secs
     }
 
+    function consumeVolume(raw) {
+        var match = raw.match(/Volume:\s*([0-9.]+)/)
+        if (!match)
+            return
+        root.volumeValue = Math.max(0, Math.min(100,
+            Math.round(parseFloat(match[1]) * 100)))
+    }
+
     ArtworkSource {
         id: artworkSource
         player: root.player
         preferredSource: root.artSource
     }
 
-    Row {
+    Text {
         anchors.horizontalCenter: albumArt.horizontalCenter
         anchors.top: parent.top
-        anchors.topMargin: 11
-        spacing: 4
+        anchors.topMargin: 16
+        text: root.volumeValue
+        color: "#b8b8bd"
+        font.pixelSize: 14
+        font.weight: Font.Medium
+    }
 
-        Item {
-            width: 22
-            height: 28
-            Text {
-                anchors.centerIn: parent
-                text: symbols.previous
-                color: root.player && root.player.canGoPrevious ? "white" : "#55555a"
-                font.pixelSize: 18
-                font.weight: Font.Medium
-            }
-            MouseArea {
-                anchors.fill: parent
-                enabled: root.player && root.player.canGoPrevious
-                onClicked: root.player.previous()
-            }
+    Timer {
+        interval: 120
+        repeat: true
+        running: root.active
+        triggeredOnStart: true
+        onTriggered: {
+            if (!volumeProbe.running)
+                volumeProbe.running = true
         }
+    }
 
-        Item {
-            width: 22
-            height: 28
-            Text {
-                anchors.centerIn: parent
-                text: root.playing ? symbols.pause : symbols.play
-                color: root.player && root.player.canTogglePlaying ? "white" : "#55555a"
-                font.pixelSize: root.playing ? 12 : 13
-                font.weight: Font.DemiBold
-            }
-            MouseArea {
-                anchors.fill: parent
-                enabled: root.player && root.player.canTogglePlaying
-                onClicked: root.player.togglePlaying()
-            }
-        }
-
-        Item {
-            width: 22
-            height: 28
-            Text {
-                anchors.centerIn: parent
-                text: symbols.next
-                color: root.player && root.player.canGoNext ? "white" : "#55555a"
-                font.pixelSize: 18
-                font.weight: Font.Medium
-            }
-            MouseArea {
-                anchors.fill: parent
-                enabled: root.player && root.player.canGoNext
-                onClicked: root.player.next()
-            }
+    Process {
+        id: volumeProbe
+        command: ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"]
+        stdout: StdioCollector {
+            onStreamFinished: root.consumeVolume(text)
         }
     }
 
