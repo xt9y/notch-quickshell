@@ -10,31 +10,24 @@ Item {
 
     visible: active && deviceName !== ""
     enabled: visible
-    width: 34
+    width: 26
     height: 28
 
     UiSymbols { id: symbols }
 
-    Rectangle {
-        anchors.fill: parent
-        radius: 8
-        color: routeMouse.containsMouse ? "#2c2c2e" : "#1c1c1e"
-        border.width: 1
-        border.color: "#343438"
-        Behavior on color { ColorAnimation { duration: 100 } }
-    }
-
     Text {
         anchors.centerIn: parent
         text: symbols.audioRoute
-        color: "#b8b8bd"
+        color: routeMouse.containsMouse ? "#d1d1d6" : "#636366"
         font.pixelSize: 10
         font.weight: Font.DemiBold
+        Behavior on color { ColorAnimation { duration: 100 } }
     }
 
     MouseArea {
         id: routeMouse
         anchors.fill: parent
+        anchors.margins: -5
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         onClicked: {
