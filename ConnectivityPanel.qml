@@ -11,6 +11,7 @@ Item {
     property bool bluetoothPowered: false
     property bool airplaneMode: false
     property bool airplaneAvailable: false
+    property bool wifiScanEnabled: wifiEnabled
     property string wifiPasswordSsid: ""
 
     signal backRequested()
@@ -23,12 +24,8 @@ Item {
     transformOrigin: Item.Top
 
     Behavior on opacity {
-        NumberAnimation {
-            duration: 125
-            easing.type: Easing.OutCubic
-        }
+        NumberAnimation { duration: 125; easing.type: Easing.OutCubic }
     }
-
     Behavior on scale {
         NumberAnimation {
             duration: 175
@@ -39,7 +36,6 @@ Item {
 
     component MiniToggle: Rectangle {
         id: toggle
-
         property bool checked: false
         property bool available: true
         signal toggled()
@@ -50,9 +46,7 @@ Item {
         opacity: available ? 1 : 0.35
         color: checked ? "#30d158" : "#343438"
 
-        Behavior on color {
-            ColorAnimation { duration: 145 }
-        }
+        Behavior on color { ColorAnimation { duration: 145 } }
 
         Rectangle {
             width: 16
@@ -61,7 +55,6 @@ Item {
             y: 2
             x: toggle.checked ? toggle.width - width - 2 : 2
             color: "#f5f5f7"
-
             Behavior on x {
                 NumberAnimation {
                     duration: 185
@@ -81,7 +74,6 @@ Item {
 
     component RoundButton: Rectangle {
         id: button
-
         property string glyph: "↻"
         signal clicked()
 
@@ -90,15 +82,9 @@ Item {
         radius: 13.5
         color: buttonMouse.containsMouse ? "#2c2c2e" : "#1c1c1e"
 
-        Behavior on color {
-            ColorAnimation { duration: 110 }
-        }
-
+        Behavior on color { ColorAnimation { duration: 110 } }
         Behavior on scale {
-            NumberAnimation {
-                duration: 120
-                easing.type: Easing.OutBack
-            }
+            NumberAnimation { duration: 120; easing.type: Easing.OutBack }
         }
 
         Text {
@@ -130,15 +116,25 @@ Item {
             : ""
 
         return "command -v nmcli >/dev/null 2>&1 || exit 0; " + scan +
-            "while IFS=$'\\t' read -r uuid type; do " +
+            "state=$(nmcli -t -f WIFI general 2>/dev/null | head -n1); " +
+            "printf 'W\\t%s\\n' \"$state\"; " +
+            "dev=$(nmcli -t -f DEVICE,TYPE,STATE device status 2>/dev/null | awk -F: '$2 == \"wifi\" && $3 == \"connected\" {print $1; exit}'); " +
+            "if [ -n \"$dev\" ]; then " +
+            "profile=$(nmcli -g GENERAL.CONNECTION device show \"$dev\" 2>/dev/null | head -n1); " +
+            "if [ -n \"$profile\" ] && [ \"$profile\" != \"--\" ]; then " +
+            "active=$(nmcli -g 802-11-wireless.ssid connection show \"$profile\" 2>/dev/null | head -n1); " +
+            "[ -n \"$active\" ] && printf 'A\\t%s\\n' \"$active\"; fi; fi; " +
+            "while IFS=: read -r uuid type; do " +
             "[ \"$type\" = \"802-11-wireless\" ] || continue; " +
             "ssid=$(nmcli -g 802-11-wireless.ssid connection show uuid \"$uuid\" 2>/dev/null | head -n1); " +
             "[ -n \"$ssid\" ] && printf 'K\\t%s\\t%s\\n' \"$ssid\" \"$uuid\"; " +
-            "done < <(nmcli -t --escape no --separator $'\\t' -f UUID,TYPE connection show 2>/dev/null); " +
-            "active=$(nmcli -t --escape no --separator $'\\t' -f IN-USE,SSID device wifi list --rescan no 2>/dev/null | while IFS=$'\\t' read -r inuse ssid; do if [ \"$inuse\" = \"*\" ]; then printf '%s' \"$ssid\"; break; fi; done); " +
-            "printf 'A\\t%s\\n' \"$active\"; " +
-            "nmcli -t --escape no --separator $'\\t' -f IN-USE,SSID,SIGNAL,SECURITY device wifi list --rescan no 2>/dev/null | " +
-            "while IFS=$'\\t' read -r inuse ssid signal security; do printf 'N\\t%s\\t%s\\t%s\\t%s\\n' \"$inuse\" \"$ssid\" \"$signal\" \"$security\"; done"
+            "done < <(nmcli -t -f UUID,TYPE connection show 2>/dev/null); " +
+            "nmcli -m multiline -f IN-USE,SSID,SIGNAL,SECURITY device wifi list --rescan no 2>/dev/null | " +
+            "awk 'BEGIN { OFS=\"\\t\"; inuse=\"\"; ssid=\"\"; signal=0; security=\"\" } " +
+            "/^IN-USE:/ { v=$0; sub(/^[^:]*:[[:space:]]*/, \"\", v); inuse=v; next } " +
+            "/^SSID:/ { v=$0; sub(/^[^:]*:[[:space:]]*/, \"\", v); ssid=v; next } " +
+            "/^SIGNAL:/ { v=$0; sub(/^[^:]*:[[:space:]]*/, \"\", v); signal=v; next } " +
+            "/^SECURITY:/ { v=$0; sub(/^[^:]*:[[:space:]]*/, \"\", v); security=v; if (ssid != \"\") print \"N\", inuse, ssid, signal, security; inuse=\"\"; ssid=\"\"; signal=0; security=\"\" }'"
     }
 
     function refreshAirplane() {
@@ -150,7 +146,6 @@ Item {
         refreshAirplane()
         if (!active || panelType !== "wifi" || wifiListProbe.running)
             return
-
         wifiListProbe.command = ["bash", "-lc", wifiScript(rescan)]
         wifiListProbe.running = true
     }
@@ -159,7 +154,6 @@ Item {
         refreshAirplane()
         if (!active || panelType !== "bluetooth")
             return
-
         if (scan && !bluetoothScan.running)
             bluetoothScan.running = true
         if (!bluetoothListProbe.running)
@@ -167,7 +161,6 @@ Item {
     }
 
     function refreshCurrent(rescan) {
-        refreshAirplane()
         if (panelType === "wifi")
             refreshWifi(rescan)
         else
@@ -191,26 +184,27 @@ Item {
                 continue
 
             var p = lines[i].split("\t")
-
+            if (p[0] === "W") {
+                wifiScanEnabled = p.length > 1 && p[1] === "enabled"
+                continue
+            }
             if (p[0] === "K" && p.length >= 3) {
                 known[p[1]] = p[2]
                 continue
             }
-
             if (p[0] === "A" && p.length >= 2) {
-                activeSsid = p.slice(1).join("\t")
+                activeSsid = p.slice(1).join("\t").trim()
                 continue
             }
-
-            if (p[0] !== "N" || p.length < 4 || p[2] === "")
+            if (p[0] !== "N" || p.length < 4 || p[2].trim() === "")
                 continue
 
-            var ssid = p[2]
+            var ssid = p[2].trim()
             var item = {
                 ssid: ssid,
-                active: p[1] === "*",
+                active: p[1].trim() === "*" || p[1].trim() === "yes",
                 strength: Math.max(0, Math.min(100, parseInt(p[3]) || 0)),
-                security: p.length > 4 ? p.slice(4).join("\t") : ""
+                security: p.length > 4 ? p.slice(4).join("\t").trim() : ""
             }
 
             if (!found[ssid] || item.active || item.strength > found[ssid].strength)
@@ -291,13 +285,21 @@ Item {
             bluetoothModel.append(result[j])
     }
 
-    function selectWifi(ssid, security, known, uuid) {
-        if (wifiAction.running || wifiForget.running)
+    function runWifi(command, environment) {
+        if (wifiAction.running)
+            return
+        wifiAction.environment = environment || ({})
+        wifiAction.command = command
+        wifiAction.running = true
+    }
+
+    function selectWifi(ssid, security, known, uuid, isActive) {
+        if (isActive || wifiAction.running || wifiForget.running)
             return
 
         if (known && uuid !== "") {
             wifiPasswordSsid = ""
-            wifiAction.exec(["nmcli", "connection", "up", "uuid", uuid])
+            runWifi(["nmcli", "connection", "up", "uuid", uuid], ({}))
             return
         }
 
@@ -308,62 +310,62 @@ Item {
         }
 
         wifiPasswordSsid = ""
-        wifiAction.exec(["nmcli", "device", "wifi", "connect", ssid])
+        runWifi(
+            ["bash", "-lc", "nmcli --wait 20 device wifi connect \"$NM_SSID\""],
+            ({ NM_SSID: ssid })
+        )
     }
 
     function submitWifiPassword(ssid, password) {
         if (password === "" || wifiAction.running)
             return
 
-        wifiAction.exec({
-            command: [
+        runWifi(
+            [
                 "bash",
                 "-lc",
                 "nmcli --wait 20 device wifi connect \"$NM_SSID\" password \"$NM_PASSWORD\""
             ],
-            environment: ({
-                NM_SSID: ssid,
-                NM_PASSWORD: password
-            })
-        })
+            ({ NM_SSID: ssid, NM_PASSWORD: password })
+        )
         wifiPasswordSsid = ""
     }
 
     function forgetWifi(uuid) {
         if (uuid === "" || wifiForget.running)
             return
-
         wifiPasswordSsid = ""
-        wifiForget.exec(["nmcli", "connection", "delete", "uuid", uuid])
+        wifiForget.command = ["nmcli", "connection", "delete", "uuid", uuid]
+        wifiForget.running = true
     }
 
     function selectBluetooth(address, paired, connected) {
         if (bluetoothAction.running || bluetoothForget.running)
             return
 
+        bluetoothAction.environment = ({ BT_ADDR: address })
         if (connected) {
-            bluetoothAction.exec(["bluetoothctl", "disconnect", address])
+            bluetoothAction.command = ["bluetoothctl", "disconnect", address]
         } else if (paired) {
-            bluetoothAction.exec(["bluetoothctl", "connect", address])
+            bluetoothAction.command = ["bluetoothctl", "connect", address]
         } else {
-            bluetoothAction.exec({
-                command: [
-                    "bash",
-                    "-lc",
-                    "bluetoothctl power on >/dev/null 2>&1 || true; " +
-                    "bluetoothctl --timeout 20 pair \"$BT_ADDR\" >/dev/null 2>&1 || exit 1; " +
-                    "bluetoothctl trust \"$BT_ADDR\" >/dev/null 2>&1 || true; " +
-                    "bluetoothctl connect \"$BT_ADDR\" >/dev/null 2>&1 || true"
-                ],
-                environment: ({ BT_ADDR: address })
-            })
+            bluetoothAction.command = [
+                "bash",
+                "-lc",
+                "bluetoothctl power on >/dev/null 2>&1 || true; " +
+                "bluetoothctl --timeout 20 pair \"$BT_ADDR\" >/dev/null 2>&1 || exit 1; " +
+                "bluetoothctl trust \"$BT_ADDR\" >/dev/null 2>&1 || true; " +
+                "bluetoothctl connect \"$BT_ADDR\" >/dev/null 2>&1 || true"
+            ]
         }
+        bluetoothAction.running = true
     }
 
     function forgetBluetooth(address) {
         if (address === "" || bluetoothForget.running)
             return
-        bluetoothForget.exec(["bluetoothctl", "remove", address])
+        bluetoothForget.command = ["bluetoothctl", "remove", address]
+        bluetoothForget.running = true
     }
 
     function toggleAirplane() {
@@ -382,7 +384,7 @@ Item {
 
     function toggleCurrentRadio() {
         if (panelType === "wifi") {
-            wifiRadioAction.command = wifiEnabled
+            wifiRadioAction.command = wifiScanEnabled
                 ? ["nmcli", "radio", "wifi", "off"]
                 : ["bash", "-lc", "rfkill unblock wlan >/dev/null 2>&1 || true; nmcli radio wifi on"]
             wifiRadioAction.running = true
@@ -392,6 +394,11 @@ Item {
                 : ["bash", "-lc", "rfkill unblock bluetooth >/dev/null 2>&1 || true; bluetoothctl power on"]
             bluetoothRadioAction.running = true
         }
+    }
+
+    onWifiEnabledChanged: {
+        if (!active || panelType !== "wifi")
+            wifiScanEnabled = wifiEnabled
     }
 
     onActiveChanged: {
@@ -428,7 +435,7 @@ Item {
             anchors.left: backGlyph.right
             anchors.leftMargin: 8
             anchors.verticalCenter: parent.verticalCenter
-            anchors.verticalCenterOffset: root.panelType === "wifi" ? 2 : 0
+            anchors.verticalCenterOffset: 2
             text: root.panelType === "wifi" ? "Wi-Fi" : "Bluetooth"
             color: "#f5f5f7"
             font.pixelSize: 16
@@ -452,7 +459,7 @@ Item {
             height: 7
             radius: 3.5
             color: root.panelType === "wifi"
-                ? (root.wifiEnabled ? "#30d158" : "#636366")
+                ? (root.wifiScanEnabled ? "#30d158" : "#636366")
                 : (root.bluetoothPowered ? "#30d158" : "#636366")
         }
     }
@@ -498,7 +505,7 @@ Item {
             anchors.right: parent.right
             anchors.rightMargin: 60
             anchors.verticalCenter: parent.verticalCenter
-            checked: root.panelType === "wifi" ? root.wifiEnabled : root.bluetoothPowered
+            checked: root.panelType === "wifi" ? root.wifiScanEnabled : root.bluetoothPowered
             onToggled: root.toggleCurrentRadio()
         }
 
@@ -537,8 +544,17 @@ Item {
 
         Text {
             anchors.centerIn: parent
-            visible: !root.wifiEnabled
+            visible: !root.wifiScanEnabled
             text: root.airplaneMode ? "Airplane mode" : "Wi-Fi is off"
+            color: "#636366"
+            font.pixelSize: 13
+            font.weight: Font.Medium
+        }
+
+        Text {
+            anchors.centerIn: parent
+            visible: root.wifiScanEnabled && wifiModel.count === 0 && !wifiListProbe.running
+            text: "No networks found · refresh"
             color: "#636366"
             font.pixelSize: 13
             font.weight: Font.Medium
@@ -547,7 +563,7 @@ Item {
         ListView {
             id: wifiList
             anchors.fill: parent
-            visible: root.wifiEnabled
+            visible: root.wifiScanEnabled && wifiModel.count > 0
             clip: true
             model: wifiModel
             spacing: 2
@@ -585,7 +601,6 @@ Item {
 
             delegate: Item {
                 id: wifiRow
-
                 width: wifiList.width
                 height: 46
                 property bool editing: root.wifiPasswordSsid === model.ssid
@@ -667,7 +682,8 @@ Item {
                         model.ssid,
                         model.security,
                         model.known,
-                        model.uuid
+                        model.uuid,
+                        model.active
                     )
                 }
 
@@ -833,7 +849,6 @@ Item {
 
             delegate: Item {
                 id: btRow
-
                 width: bluetoothList.width
                 height: 46
 
@@ -841,6 +856,7 @@ Item {
                     anchors.fill: parent
                     radius: 10
                     color: btHover.hovered ? "#161618" : "transparent"
+                    Behavior on color { ColorAnimation { duration: 100 } }
                 }
 
                 Rectangle {
@@ -919,7 +935,7 @@ Item {
     }
 
     Timer {
-        interval: root.panelType === "bluetooth" ? 900 : 2200
+        interval: root.panelType === "bluetooth" ? 900 : 2000
         repeat: true
         running: root.active
         onTriggered: root.refreshCurrent(false)
@@ -934,16 +950,12 @@ Item {
             "read -r total blocked <<<$(rfkill -n -o SOFT 2>/dev/null | awk '{t++; if ($1 ~ /^blocked$/) b++} END {print t+0, b+0}'); " +
             "if (( total > 0 )); then printf 'available\\n'; if (( blocked == total )); then printf 'blocked\\n'; else printf 'unblocked\\n'; fi; else printf 'unavailable\\nunblocked\\n'; fi"
         ]
-        stdout: StdioCollector {
-            onStreamFinished: root.consumeAirplane(text)
-        }
+        stdout: StdioCollector { onStreamFinished: root.consumeAirplane(text) }
     }
 
     Process {
         id: wifiListProbe
-        stdout: StdioCollector {
-            onStreamFinished: root.consumeWifiList(text)
-        }
+        stdout: StdioCollector { onStreamFinished: root.consumeWifiList(text) }
     }
 
     Process {
@@ -984,9 +996,7 @@ Item {
             "printf 'D\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$addr\" \"${paired:-no}\" \"${connected:-no}\" \"${trusted:-no}\" \"$label\"; " +
             "done"
         ]
-        stdout: StdioCollector {
-            onStreamFinished: root.consumeBluetoothList(text)
-        }
+        stdout: StdioCollector { onStreamFinished: root.consumeBluetoothList(text) }
     }
 
     Process {
