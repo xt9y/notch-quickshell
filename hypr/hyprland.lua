@@ -54,7 +54,7 @@ hl.config({
     general = {
         gaps_in = 5,
         gaps_out = 10,
-        border_size = 2,
+        border_size = 1,
         resize_on_border = false,
         allow_tearing = false,
         layout = "dwindle",
@@ -66,7 +66,8 @@ hl.config({
     },
 
     decoration = {
-        rounding = 10,
+        -- Match the notch's 8px lower-corner radius.
+        rounding = 8,
         rounding_power = 2,
         active_opacity = 1.0,
         inactive_opacity = 1.0,
@@ -176,16 +177,17 @@ hl.window_rule({
     suppress_event = "maximize",
 })
 
--- XWayland Video Bridge is a KDE screen-sharing helper. Hyprland cannot use
--- KDE's normal hiding mechanism for its dummy window, so hide it explicitly
--- while keeping the bridge process available for XWayland screen sharing.
+-- XWayland Video Bridge is a KDE screen-sharing helper. Keep the helper alive,
+-- but make its dummy window floating so it can never consume a tiled slot.
 hl.window_rule({
     name = "xwayland-video-bridge-fixes",
     match = { class = "xwaylandvideobridge" },
+    float = true,
+    size = { 1, 1 },
+    max_size = { 1, 1 },
     no_initial_focus = true,
     no_focus = true,
     no_anim = true,
     no_blur = true,
-    max_size = { 1, 1 },
     opacity = "0.0 override",
 })
