@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Shapes
 
 Item {
     id: root
@@ -17,11 +18,21 @@ Item {
     visible: opacity > 0.01
     enabled: active
     transformOrigin: Item.Top
-    Behavior on opacity { NumberAnimation { duration: 115; easing.type: Easing.OutCubic } }
-    Behavior on scale { NumberAnimation { duration: 165; easing.type: Easing.OutBack; easing.overshoot: 0.32 } }
+
+    Behavior on opacity {
+        NumberAnimation { duration: 115; easing.type: Easing.OutCubic }
+    }
+    Behavior on scale {
+        NumberAnimation {
+            duration: 165
+            easing.type: Easing.OutBack
+            easing.overshoot: 0.32
+        }
+    }
 
     function timeText(seconds) {
-        if (!isFinite(seconds) || seconds < 0) seconds = 0
+        if (!isFinite(seconds) || seconds < 0)
+            seconds = 0
         var total = Math.floor(seconds)
         var mins = Math.floor(total / 60)
         var secs = total % 60
@@ -34,11 +45,16 @@ Item {
         anchors.top: parent.top
         anchors.topMargin: 12
         spacing: 17
+
         Text {
             text: "‹"
             color: root.player && root.player.canGoPrevious ? "white" : "#55555a"
             font.pixelSize: 25
-            MouseArea { anchors.fill: parent; enabled: root.player && root.player.canGoPrevious; onClicked: root.player.previous() }
+            MouseArea {
+                anchors.fill: parent
+                enabled: root.player && root.player.canGoPrevious
+                onClicked: root.player.previous()
+            }
         }
         Text {
             text: root.playing ? "Ⅱ" : "▶"
@@ -46,13 +62,21 @@ Item {
             font.pixelSize: root.playing ? 16 : 15
             font.weight: Font.Medium
             anchors.verticalCenter: parent.verticalCenter
-            MouseArea { anchors.fill: parent; enabled: root.player && root.player.canTogglePlaying; onClicked: root.player.togglePlaying() }
+            MouseArea {
+                anchors.fill: parent
+                enabled: root.player && root.player.canTogglePlaying
+                onClicked: root.player.togglePlaying()
+            }
         }
         Text {
             text: "›"
             color: root.player && root.player.canGoNext ? "white" : "#55555a"
             font.pixelSize: 25
-            MouseArea { anchors.fill: parent; enabled: root.player && root.player.canGoNext; onClicked: root.player.next() }
+            MouseArea {
+                anchors.fill: parent
+                enabled: root.player && root.player.canGoNext
+                onClicked: root.player.next()
+            }
         }
     }
 
@@ -61,7 +85,9 @@ Item {
         anchors.rightMargin: 24
         anchors.top: parent.top
         anchors.topMargin: 17
-        text: root.playing ? root.timeText(root.position) + " / " + root.timeText(root.length) : "Paused · " + root.timeText(root.position) + " / " + root.timeText(root.length)
+        text: root.playing
+            ? root.timeText(root.position) + " / " + root.timeText(root.length)
+            : "Paused · " + root.timeText(root.position) + " / " + root.timeText(root.length)
         color: root.playing ? "#8e8e93" : "#b8b8bd"
         font.pixelSize: 12
         font.weight: Font.Medium
@@ -69,22 +95,31 @@ Item {
 
     Item {
         id: albumArt
+        property real artRadius: 14
+
         anchors.left: parent.left
         anchors.leftMargin: 24
         anchors.top: parent.top
         anchors.topMargin: 52
         width: 68
         height: 68
+
         Rectangle {
             anchors.fill: parent
-            radius: 14
+            radius: albumArt.artRadius
             color: "#1c1c1e"
-            Text { anchors.centerIn: parent; visible: artImage.status !== Image.Ready; text: "♪"; color: "#636366"; font.pixelSize: 25 }
+            Text {
+                anchors.centerIn: parent
+                visible: artImage.status !== Image.Ready
+                text: "♪"
+                color: "#636366"
+                font.pixelSize: 25
+            }
         }
+
         Image {
             id: artImage
             anchors.fill: parent
-            anchors.margins: 2
             source: root.artSource
             fillMode: Image.PreserveAspectCrop
             asynchronous: true
@@ -94,9 +129,75 @@ Item {
             sourceSize.width: 160
             sourceSize.height: 160
             opacity: status === Image.Ready ? 1 : 0
-            Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+            Behavior on opacity {
+                NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+            }
         }
-        Rectangle { anchors.fill: parent; radius: 14; color: "transparent"; border.width: 3; border.color: "#000000" }
+
+        // QtQuick Image is rectangular. These four filled corner masks remove
+        // the image outside the rounded silhouette instead of merely drawing a
+        // thin rounded outline on top of it.
+        Shape {
+            anchors.fill: parent
+            antialiasing: true
+
+            ShapePath {
+                strokeWidth: -1
+                fillColor: "#000000"
+                startX: 0
+                startY: 0
+                PathLine { x: albumArt.artRadius; y: 0 }
+                PathQuad {
+                    x: 0
+                    y: albumArt.artRadius
+                    controlX: 0
+                    controlY: 0
+                }
+                PathLine { x: 0; y: 0 }
+            }
+            ShapePath {
+                strokeWidth: -1
+                fillColor: "#000000"
+                startX: albumArt.width
+                startY: 0
+                PathLine { x: albumArt.width - albumArt.artRadius; y: 0 }
+                PathQuad {
+                    x: albumArt.width
+                    y: albumArt.artRadius
+                    controlX: albumArt.width
+                    controlY: 0
+                }
+                PathLine { x: albumArt.width; y: 0 }
+            }
+            ShapePath {
+                strokeWidth: -1
+                fillColor: "#000000"
+                startX: 0
+                startY: albumArt.height
+                PathLine { x: 0; y: albumArt.height - albumArt.artRadius }
+                PathQuad {
+                    x: albumArt.artRadius
+                    y: albumArt.height
+                    controlX: 0
+                    controlY: albumArt.height
+                }
+                PathLine { x: 0; y: albumArt.height }
+            }
+            ShapePath {
+                strokeWidth: -1
+                fillColor: "#000000"
+                startX: albumArt.width
+                startY: albumArt.height
+                PathLine { x: albumArt.width; y: albumArt.height - albumArt.artRadius }
+                PathQuad {
+                    x: albumArt.width - albumArt.artRadius
+                    y: albumArt.height
+                    controlX: albumArt.width
+                    controlY: albumArt.height
+                }
+                PathLine { x: albumArt.width; y: albumArt.height }
+            }
+        }
     }
 
     Item {
@@ -107,6 +208,7 @@ Item {
         anchors.top: parent.top
         anchors.topMargin: 53
         height: 67
+
         Text {
             id: titleText
             anchors.left: parent.left
@@ -144,7 +246,9 @@ Item {
                 height: parent.height
                 radius: parent.radius
                 color: "#f2f2f7"
-                Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.Linear } }
+                Behavior on width {
+                    NumberAnimation { duration: 180; easing.type: Easing.Linear }
+                }
             }
         }
     }
