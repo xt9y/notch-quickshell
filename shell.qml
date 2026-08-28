@@ -72,8 +72,6 @@ ShellRoot {
             property int lastBatteryState: -1
             property int lastBatteryPercent: -1
             property string batteryEventText: "Battery"
-            property bool batteryCriticalPopup:
-                transientMode === "battery" && batteryLevel <= 0.20
 
             // Prefer a playing MPRIS player, but keep the first player around
             // while paused/stopped so pause events can still show its metadata.
@@ -601,50 +599,6 @@ ShellRoot {
                         controlY: notchShape.height
                     }
                     PathLine { x: 0; y: 0 }
-                }
-            }
-
-            // Subtle warning perimeter exists only while a <=20% battery popup
-            // is actually on screen. It disappears with the transient itself.
-            Shape {
-                id: lowBatteryOutline
-                anchors.fill: parent
-                antialiasing: true
-                opacity: island.batteryCriticalPopup && island.expanded ? 1 : 0
-                visible: opacity > 0.01
-
-                Behavior on opacity {
-                    NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
-                }
-
-                ShapePath {
-                    strokeWidth: 1.25
-                    strokeColor: "#80ff453a"
-                    fillColor: "transparent"
-                    startX: 1
-                    startY: 1
-                    PathLine { x: lowBatteryOutline.width - 1; y: 1 }
-                    PathLine {
-                        x: lowBatteryOutline.width - 1
-                        y: lowBatteryOutline.height - island.cornerRadius
-                    }
-                    PathQuad {
-                        x: lowBatteryOutline.width - island.cornerRadius
-                        y: lowBatteryOutline.height - 1
-                        controlX: lowBatteryOutline.width - 1
-                        controlY: lowBatteryOutline.height - 1
-                    }
-                    PathLine {
-                        x: island.cornerRadius
-                        y: lowBatteryOutline.height - 1
-                    }
-                    PathQuad {
-                        x: 1
-                        y: lowBatteryOutline.height - island.cornerRadius
-                        controlX: 1
-                        controlY: lowBatteryOutline.height - 1
-                    }
-                    PathLine { x: 1; y: 1 }
                 }
             }
 
