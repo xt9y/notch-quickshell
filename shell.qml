@@ -38,8 +38,6 @@ ShellRoot {
             property int expandedWidth: 540
             property int cornerRadius: 13
 
-            // Persistent pages. The notch always collapses when the pointer
-            // leaves; this only decides what the next hover displays.
             property string selectedMode: "normal"
             property string transientMode: ""
             property string displayMode: transientMode !== "" ? transientMode : selectedMode
@@ -68,8 +66,7 @@ ShellRoot {
             property int lastBatteryState: -1
             property string batteryEventText: "Battery"
 
-            // Media. Prefer a player that is currently playing, otherwise use
-            // the first MPRIS player so paused media remains available.
+            // Media.
             property var activePlayer: {
                 var players = Mpris.players.values
                 for (var i = 0; i < players.length; ++i) {
@@ -89,8 +86,7 @@ ShellRoot {
                 return artist !== "" ? title + " — " + artist : title
             }
 
-            // Read-only volume and brightness observation. These values are
-            // never written by the notch; KDE/hardware keys remain in control.
+            // Read-only volume and brightness observation.
             property int volumePercent: 0
             property bool volumeMuted: false
             property int lastVolumePercent: -1
@@ -98,8 +94,7 @@ ShellRoot {
             property int brightnessPercent: 0
             property int lastBrightnessPercent: -1
 
-            // Connectivity state. Wi-Fi/Bluetooth can be toggled only from the
-            // explicit Connectivity page; neither affects volume/brightness.
+            // Connectivity.
             property bool wifiAvailable: false
             property bool wifiEnabled: false
             property string wifiSsid: ""
@@ -250,8 +245,7 @@ ShellRoot {
                 id: hover
             }
 
-            // Base click cycles Normal -> Music -> Connectivity. More specific
-            // controls below sit above this MouseArea and consume their clicks.
+            // Base click cycles Normal -> Music -> Connectivity.
             MouseArea {
                 anchors.fill: parent
                 onClicked: island.cycleMode()
@@ -272,8 +266,6 @@ ShellRoot {
                 onTriggered: island.checkBatteryState()
             }
 
-            // Poll the values that KDE's hardware-key handlers change. These
-            // probes are observational only; there is no scroll-to-change code.
             Timer {
                 interval: 500
                 repeat: true
@@ -352,8 +344,6 @@ ShellRoot {
                 onRunningChanged: if (!running && !bluetoothProbe.running) bluetoothProbe.running = true
             }
 
-            // One exact silhouette: square top, flat bottom and lower corners
-            // only. Nothing in the new modes changes the vertical geometry.
             Shape {
                 id: notchShape
 
@@ -391,296 +381,406 @@ ShellRoot {
                 }
             }
 
-            // Tiny idle media affordance. It fits entirely in the left software
-            // wing and does not alter the collapsed notch dimensions.
-            Text {
-                anchors {
-                    left: parent.left
-                    leftMargin: 19
-                    verticalCenter: notchShape.verticalCenter
-                }
-                visible: island.musicAvailable && !island.expanded
-                text: "♪"
-                color: "#c7c7cc"
-                font.pixelSize: 13
-                font.weight: Font.Medium
-            }
-
-            // ---------- NORMAL ----------
+            // All UI content lives in this one shared coordinate system.
+            // Centering against this Item is stable across all modes and avoids
+            // QtQuick Shape anchor-line quirks.
             Item {
-                anchors.fill: parent
-                visible: island.displayMode === "normal" && island.expanded
+                id: content
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                }
+                height: island.visualHeight
 
-                Item {
-                    id: normalLeft
+                Text {
                     anchors {
                         left: parent.left
-                        verticalCenter: notchShape.verticalCenter
+                        leftMargin: 19
+                        verticalCenter: parent.verticalCenter
                     }
-                    width: island.wingWidth
-                    height: notchShape.height
+                    visible: island.musicAvailable && !island.expanded
+                    text: "♪"
+                    color: "#c7c7cc"
+                    font.pixelSize: 13
+                    font.weight: Font.Medium
+                }
 
-                    Text {
-                        id: normalTime
-                        anchors {
-                            left: parent.left
-                            leftMargin: 24
-                            verticalCenter: parent.verticalCenter
-                        }
-                        text: Qt.formatDateTime(clock.date, "HH:mm")
-                        color: "white"
-                        font.pixelSize: 17
-                        font.weight: Font.Medium
-                    }
+                // ---------- NORMAL ----------
+                Item {
+                    anchors.fill: parent
+                    visible: island.displayMode === "normal" && island.expanded
 
                     Item {
+                        id: normalLeft
                         anchors {
-                            left: normalTime.right
-                            leftMargin: 10
+                            left: parent.left
                             verticalCenter: parent.verticalCenter
                         }
-                        width: island.batteryCharging ? 48 : 36
-                        height: 18
-                        visible: island.battery && island.battery.ready
+                        width: island.wingWidth
+                        height: parent.height
 
-                        Rectangle {
-                            id: normalBatteryBody
+                        Text {
+                            id: normalTime
                             anchors {
                                 left: parent.left
+                                leftMargin: 24
                                 verticalCenter: parent.verticalCenter
                             }
-                            width: 30
-                            height: 15
-                            radius: 3.5
-                            color: "transparent"
-                            border.width: 1
-                            border.color: "#d1d1d6"
+                            text: Qt.formatDateTime(clock.date, "HH:mm")
+                            color: "white"
+                            font.pixelSize: 17
+                            font.weight: Font.Medium
+                        }
+
+                        Item {
+                            anchors {
+                                left: normalTime.right
+                                leftMargin: 10
+                                verticalCenter: parent.verticalCenter
+                            }
+                            width: island.batteryCharging ? 48 : 36
+                            height: 18
+                            visible: island.battery && island.battery.ready
+
+                            Rectangle {
+                                id: normalBatteryBody
+                                anchors {
+                                    left: parent.left
+                                    verticalCenter: parent.verticalCenter
+                                }
+                                width: 30
+                                height: 15
+                                radius: 3.5
+                                color: "transparent"
+                                border.width: 1
+                                border.color: "#d1d1d6"
+
+                                Rectangle {
+                                    anchors {
+                                        left: parent.left
+                                        leftMargin: 3
+                                        top: parent.top
+                                        topMargin: 3
+                                        bottom: parent.bottom
+                                        bottomMargin: 3
+                                    }
+                                    width: Math.max(0, (normalBatteryBody.width - 6) * island.batteryLevel)
+                                    radius: 1.7
+                                    color: island.batteryColor
+                                }
+                            }
 
                             Rectangle {
                                 anchors {
-                                    left: parent.left
-                                    leftMargin: 3
-                                    top: parent.top
-                                    topMargin: 3
-                                    bottom: parent.bottom
-                                    bottomMargin: 3
+                                    left: normalBatteryBody.right
+                                    leftMargin: 1
+                                    verticalCenter: parent.verticalCenter
                                 }
-                                width: Math.max(0, (normalBatteryBody.width - 6) * island.batteryLevel)
-                                radius: 1.7
-                                color: island.batteryColor
+                                width: 3
+                                height: 7
+                                radius: 1.5
+                                color: "#d1d1d6"
                             }
                         }
-
-                        Rectangle {
-                            anchors {
-                                left: normalBatteryBody.right
-                                leftMargin: 1
-                                verticalCenter: parent.verticalCenter
-                            }
-                            width: 3
-                            height: 7
-                            radius: 1.5
-                            color: "#d1d1d6"
-                        }
-                    }
-                }
-
-                Text {
-                    anchors {
-                        right: parent.right
-                        rightMargin: 24
-                        verticalCenter: notchShape.verticalCenter
-                    }
-                    text: Qt.formatDateTime(clock.date, "ddd, d MMM")
-                    color: "#b8b8bd"
-                    font.pixelSize: 17
-                    font.weight: Font.Medium
-                }
-            }
-
-            // ---------- MUSIC ----------
-            Item {
-                anchors.fill: parent
-                visible: island.displayMode === "music" && island.expanded
-
-                Row {
-                    anchors {
-                        left: parent.left
-                        leftMargin: 24
-                        verticalCenter: notchShape.verticalCenter
-                    }
-                    spacing: 16
-
-                    Text {
-                        text: "‹"
-                        color: island.activePlayer && island.activePlayer.canGoPrevious ? "white" : "#55555a"
-                        font.pixelSize: 25
-                        MouseArea {
-                            anchors.fill: parent
-                            enabled: island.activePlayer && island.activePlayer.canGoPrevious
-                            onClicked: island.activePlayer.previous()
-                        }
                     }
 
                     Text {
-                        text: island.musicPlaying ? "Ⅱ" : "▶"
-                        color: island.activePlayer && island.activePlayer.canTogglePlaying ? "white" : "#55555a"
-                        font.pixelSize: island.musicPlaying ? 16 : 15
-                        font.weight: Font.Medium
-                        anchors.verticalCenter: parent.verticalCenter
-                        MouseArea {
-                            anchors.fill: parent
-                            enabled: island.activePlayer && island.activePlayer.canTogglePlaying
-                            onClicked: island.activePlayer.togglePlaying()
-                        }
-                    }
-
-                    Text {
-                        text: "›"
-                        color: island.activePlayer && island.activePlayer.canGoNext ? "white" : "#55555a"
-                        font.pixelSize: 25
-                        MouseArea {
-                            anchors.fill: parent
-                            enabled: island.activePlayer && island.activePlayer.canGoNext
-                            onClicked: island.activePlayer.next()
-                        }
-                    }
-                }
-
-                Text {
-                    anchors {
-                        right: parent.right
-                        rightMargin: 24
-                        verticalCenter: notchShape.verticalCenter
-                    }
-                    width: island.wingWidth - 34
-                    text: island.musicText
-                    color: island.musicAvailable ? "#e8e8ed" : "#77777c"
-                    font.pixelSize: 15
-                    font.weight: Font.Medium
-                    horizontalAlignment: Text.AlignRight
-                    elide: Text.ElideRight
-                    maximumLineCount: 1
-                }
-            }
-
-            // ---------- CONNECTIVITY ----------
-            Item {
-                anchors.fill: parent
-                visible: island.displayMode === "connectivity" && island.expanded
-
-                Item {
-                    anchors {
-                        left: parent.left
-                        verticalCenter: notchShape.verticalCenter
-                    }
-                    width: island.wingWidth
-                    height: notchShape.height
-
-                    Rectangle {
-                        anchors {
-                            left: parent.left
-                            leftMargin: 24
-                            verticalCenter: parent.verticalCenter
-                        }
-                        width: 7
-                        height: 7
-                        radius: 3.5
-                        color: island.wifiEnabled ? "#30d158" : "#636366"
-                    }
-
-                    Text {
-                        anchors {
-                            left: parent.left
-                            leftMargin: 39
-                            right: parent.right
-                            rightMargin: 12
-                            verticalCenter: parent.verticalCenter
-                        }
-                        text: !island.wifiAvailable
-                            ? "Wi-Fi unavailable"
-                            : island.wifiEnabled
-                                ? "Wi-Fi" + (island.wifiSsid !== "" ? " · " + island.wifiSsid : "")
-                                : "Wi-Fi · Off"
-                        color: "#e8e8ed"
-                        font.pixelSize: 14
-                        font.weight: Font.Medium
-                        elide: Text.ElideRight
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        enabled: island.wifiAvailable && !wifiToggle.running
-                        onClicked: {
-                            wifiToggle.command = ["nmcli", "radio", "wifi", island.wifiEnabled ? "off" : "on"]
-                            wifiToggle.running = true
-                        }
-                    }
-                }
-
-                Item {
-                    anchors {
-                        right: parent.right
-                        verticalCenter: notchShape.verticalCenter
-                    }
-                    width: island.wingWidth
-                    height: notchShape.height
-
-                    Rectangle {
                         anchors {
                             right: parent.right
                             rightMargin: 24
                             verticalCenter: parent.verticalCenter
                         }
-                        width: 7
-                        height: 7
-                        radius: 3.5
-                        color: island.bluetoothPowered ? "#30d158" : "#636366"
+                        text: Qt.formatDateTime(clock.date, "ddd, d MMM")
+                        color: "#b8b8bd"
+                        font.pixelSize: 17
+                        font.weight: Font.Medium
+                    }
+                }
+
+                // ---------- MUSIC ----------
+                Item {
+                    anchors.fill: parent
+                    visible: island.displayMode === "music" && island.expanded
+
+                    Row {
+                        anchors {
+                            left: parent.left
+                            leftMargin: 24
+                            verticalCenter: parent.verticalCenter
+                        }
+                        spacing: 16
+
+                        Text {
+                            text: "‹"
+                            color: island.activePlayer && island.activePlayer.canGoPrevious ? "white" : "#55555a"
+                            font.pixelSize: 25
+                            MouseArea {
+                                anchors.fill: parent
+                                enabled: island.activePlayer && island.activePlayer.canGoPrevious
+                                onClicked: island.activePlayer.previous()
+                            }
+                        }
+
+                        Text {
+                            text: island.musicPlaying ? "Ⅱ" : "▶"
+                            color: island.activePlayer && island.activePlayer.canTogglePlaying ? "white" : "#55555a"
+                            font.pixelSize: island.musicPlaying ? 16 : 15
+                            font.weight: Font.Medium
+                            anchors.verticalCenter: parent.verticalCenter
+                            MouseArea {
+                                anchors.fill: parent
+                                enabled: island.activePlayer && island.activePlayer.canTogglePlaying
+                                onClicked: island.activePlayer.togglePlaying()
+                            }
+                        }
+
+                        Text {
+                            text: "›"
+                            color: island.activePlayer && island.activePlayer.canGoNext ? "white" : "#55555a"
+                            font.pixelSize: 25
+                            MouseArea {
+                                anchors.fill: parent
+                                enabled: island.activePlayer && island.activePlayer.canGoNext
+                                onClicked: island.activePlayer.next()
+                            }
+                        }
                     }
 
                     Text {
                         anchors {
-                            left: parent.left
-                            leftMargin: 12
                             right: parent.right
-                            rightMargin: 39
+                            rightMargin: 24
                             verticalCenter: parent.verticalCenter
                         }
-                        text: !island.bluetoothAvailable
-                            ? "Bluetooth unavailable"
-                            : island.bluetoothPowered
-                                ? (island.bluetoothDevice !== "" ? island.bluetoothDevice + " · Bluetooth" : "Bluetooth · On")
-                                : "Bluetooth · Off"
-                        color: "#e8e8ed"
-                        font.pixelSize: 14
+                        width: island.wingWidth - 34
+                        text: island.musicText
+                        color: island.musicAvailable ? "#e8e8ed" : "#77777c"
+                        font.pixelSize: 15
                         font.weight: Font.Medium
                         horizontalAlignment: Text.AlignRight
-                        elide: Text.ElideLeft
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                    }
+                }
+
+                // ---------- CONNECTIVITY ----------
+                Item {
+                    anchors.fill: parent
+                    visible: island.displayMode === "connectivity" && island.expanded
+
+                    Item {
+                        anchors {
+                            left: parent.left
+                            verticalCenter: parent.verticalCenter
+                        }
+                        width: island.wingWidth
+                        height: parent.height
+
+                        Rectangle {
+                            anchors {
+                                left: parent.left
+                                leftMargin: 24
+                                verticalCenter: parent.verticalCenter
+                            }
+                            width: 7
+                            height: 7
+                            radius: 3.5
+                            color: island.wifiEnabled ? "#30d158" : "#636366"
+                        }
+
+                        Text {
+                            anchors {
+                                left: parent.left
+                                leftMargin: 39
+                                right: parent.right
+                                rightMargin: 12
+                                verticalCenter: parent.verticalCenter
+                            }
+                            text: island.wifiSsid !== "" ? island.wifiSsid : "Wi-Fi"
+                            color: "#e8e8ed"
+                            font.pixelSize: 14
+                            font.weight: Font.Medium
+                            elide: Text.ElideRight
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            enabled: island.wifiAvailable && !wifiToggle.running
+                            onClicked: {
+                                wifiToggle.command = ["nmcli", "radio", "wifi", island.wifiEnabled ? "off" : "on"]
+                                wifiToggle.running = true
+                            }
+                        }
                     }
 
-                    MouseArea {
-                        anchors.fill: parent
-                        enabled: island.bluetoothAvailable && !bluetoothToggle.running
-                        onClicked: {
-                            bluetoothToggle.command = ["bluetoothctl", "power", island.bluetoothPowered ? "off" : "on"]
-                            bluetoothToggle.running = true
+                    Item {
+                        anchors {
+                            right: parent.right
+                            verticalCenter: parent.verticalCenter
+                        }
+                        width: island.wingWidth
+                        height: parent.height
+
+                        Rectangle {
+                            anchors {
+                                right: parent.right
+                                rightMargin: 24
+                                verticalCenter: parent.verticalCenter
+                            }
+                            width: 7
+                            height: 7
+                            radius: 3.5
+                            color: island.bluetoothPowered ? "#30d158" : "#636366"
+                        }
+
+                        Text {
+                            anchors {
+                                left: parent.left
+                                leftMargin: 12
+                                right: parent.right
+                                rightMargin: 39
+                                verticalCenter: parent.verticalCenter
+                            }
+                            text: island.bluetoothDevice !== "" ? island.bluetoothDevice : "Bluetooth"
+                            color: "#e8e8ed"
+                            font.pixelSize: 14
+                            font.weight: Font.Medium
+                            horizontalAlignment: Text.AlignRight
+                            elide: Text.ElideLeft
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            enabled: island.bluetoothAvailable && !bluetoothToggle.running
+                            onClicked: {
+                                bluetoothToggle.command = ["bluetoothctl", "power", island.bluetoothPowered ? "off" : "on"]
+                                bluetoothToggle.running = true
+                            }
                         }
                     }
                 }
-            }
 
-            // ---------- TEMPORARY VOLUME ----------
-            Item {
-                anchors.fill: parent
-                visible: island.displayMode === "volume" && island.expanded
-
+                // ---------- TEMPORARY VOLUME ----------
                 Item {
-                    anchors {
-                        left: parent.left
-                        verticalCenter: notchShape.verticalCenter
+                    anchors.fill: parent
+                    visible: island.displayMode === "volume" && island.expanded
+
+                    Item {
+                        anchors {
+                            left: parent.left
+                            verticalCenter: parent.verticalCenter
+                        }
+                        width: island.wingWidth
+                        height: parent.height
+
+                        Text {
+                            anchors {
+                                left: parent.left
+                                leftMargin: 24
+                                verticalCenter: parent.verticalCenter
+                            }
+                            text: island.volumeMuted ? "Muted" : "Volume"
+                            color: "white"
+                            font.pixelSize: 15
+                            font.weight: Font.Medium
+                        }
+
+                        Rectangle {
+                            anchors {
+                                right: parent.right
+                                rightMargin: 14
+                                verticalCenter: parent.verticalCenter
+                            }
+                            width: 76
+                            height: 4
+                            radius: 2
+                            color: "#343438"
+
+                            Rectangle {
+                                width: parent.width * (island.volumeMuted ? 0 : island.volumePercent / 100)
+                                height: parent.height
+                                radius: parent.radius
+                                color: "#f2f2f7"
+                            }
+                        }
                     }
-                    width: island.wingWidth
-                    height: notchShape.height
+
+                    Text {
+                        anchors {
+                            right: parent.right
+                            rightMargin: 24
+                            verticalCenter: parent.verticalCenter
+                        }
+                        text: island.volumeMuted ? "—" : island.volumePercent + "%"
+                        color: "#e8e8ed"
+                        font.pixelSize: 17
+                        font.weight: Font.Medium
+                    }
+                }
+
+                // ---------- TEMPORARY BRIGHTNESS ----------
+                Item {
+                    anchors.fill: parent
+                    visible: island.displayMode === "brightness" && island.expanded
+
+                    Item {
+                        anchors {
+                            left: parent.left
+                            verticalCenter: parent.verticalCenter
+                        }
+                        width: island.wingWidth
+                        height: parent.height
+
+                        Text {
+                            anchors {
+                                left: parent.left
+                                leftMargin: 24
+                                verticalCenter: parent.verticalCenter
+                            }
+                            text: "☀"
+                            color: "white"
+                            font.pixelSize: 18
+                        }
+
+                        Rectangle {
+                            anchors {
+                                right: parent.right
+                                rightMargin: 14
+                                verticalCenter: parent.verticalCenter
+                            }
+                            width: 105
+                            height: 4
+                            radius: 2
+                            color: "#343438"
+
+                            Rectangle {
+                                width: parent.width * (island.brightnessPercent / 100)
+                                height: parent.height
+                                radius: parent.radius
+                                color: "#f2f2f7"
+                            }
+                        }
+                    }
+
+                    Text {
+                        anchors {
+                            right: parent.right
+                            rightMargin: 24
+                            verticalCenter: parent.verticalCenter
+                        }
+                        text: island.brightnessPercent + "%"
+                        color: "#e8e8ed"
+                        font.pixelSize: 17
+                        font.weight: Font.Medium
+                    }
+                }
+
+                // ---------- TEMPORARY BATTERY ----------
+                Item {
+                    anchors.fill: parent
+                    visible: island.displayMode === "battery" && island.expanded
 
                     Text {
                         anchors {
@@ -688,162 +788,57 @@ ShellRoot {
                             leftMargin: 24
                             verticalCenter: parent.verticalCenter
                         }
-                        text: island.volumeMuted ? "Muted" : "Volume"
-                        color: "white"
+                        text: island.batteryEventText
+                        color: island.batteryCharging ? "#30d158" : "#e8e8ed"
+                        font.pixelSize: 16
+                        font.weight: Font.Medium
+                    }
+
+                    Text {
+                        anchors {
+                            right: parent.right
+                            rightMargin: 24
+                            verticalCenter: parent.verticalCenter
+                        }
+                        text: Math.round(island.batteryLevel * 100) + "%"
+                        color: island.batteryColor
+                        font.pixelSize: 17
+                        font.weight: Font.Medium
+                    }
+                }
+
+                // ---------- TEMPORARY BLUETOOTH ----------
+                Item {
+                    anchors.fill: parent
+                    visible: island.displayMode === "bluetooth" && island.expanded
+
+                    Text {
+                        anchors {
+                            left: parent.left
+                            leftMargin: 24
+                            verticalCenter: parent.verticalCenter
+                        }
+                        text: "Bluetooth"
+                        color: "#e8e8ed"
                         font.pixelSize: 15
                         font.weight: Font.Medium
                     }
 
-                    Rectangle {
-                        anchors {
-                            right: parent.right
-                            rightMargin: 14
-                            verticalCenter: parent.verticalCenter
-                        }
-                        width: 76
-                        height: 4
-                        radius: 2
-                        color: "#343438"
-
-                        Rectangle {
-                            width: parent.width * (island.volumeMuted ? 0 : island.volumePercent / 100)
-                            height: parent.height
-                            radius: parent.radius
-                            color: "#f2f2f7"
-                        }
-                    }
-                }
-
-                Text {
-                    anchors {
-                        right: parent.right
-                        rightMargin: 24
-                        verticalCenter: notchShape.verticalCenter
-                    }
-                    text: island.volumeMuted ? "—" : island.volumePercent + "%"
-                    color: "#e8e8ed"
-                    font.pixelSize: 17
-                    font.weight: Font.Medium
-                }
-            }
-
-            // ---------- TEMPORARY BRIGHTNESS ----------
-            Item {
-                anchors.fill: parent
-                visible: island.displayMode === "brightness" && island.expanded
-
-                Item {
-                    anchors {
-                        left: parent.left
-                        verticalCenter: notchShape.verticalCenter
-                    }
-                    width: island.wingWidth
-                    height: notchShape.height
-
                     Text {
                         anchors {
-                            left: parent.left
-                            leftMargin: 24
-                            verticalCenter: parent.verticalCenter
-                        }
-                        text: "☀"
-                        color: "white"
-                        font.pixelSize: 18
-                    }
-
-                    Rectangle {
-                        anchors {
                             right: parent.right
-                            rightMargin: 14
+                            rightMargin: 24
                             verticalCenter: parent.verticalCenter
                         }
-                        width: 105
-                        height: 4
-                        radius: 2
-                        color: "#343438"
-
-                        Rectangle {
-                            width: parent.width * (island.brightnessPercent / 100)
-                            height: parent.height
-                            radius: parent.radius
-                            color: "#f2f2f7"
-                        }
+                        width: island.wingWidth - 30
+                        text: island.bluetoothEventText
+                        color: "white"
+                        font.pixelSize: 15
+                        font.weight: Font.Medium
+                        horizontalAlignment: Text.AlignRight
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
                     }
-                }
-
-                Text {
-                    anchors {
-                        right: parent.right
-                        rightMargin: 24
-                        verticalCenter: notchShape.verticalCenter
-                    }
-                    text: island.brightnessPercent + "%"
-                    color: "#e8e8ed"
-                    font.pixelSize: 17
-                    font.weight: Font.Medium
-                }
-            }
-
-            // ---------- TEMPORARY BATTERY ----------
-            Item {
-                anchors.fill: parent
-                visible: island.displayMode === "battery" && island.expanded
-
-                Text {
-                    anchors {
-                        left: parent.left
-                        leftMargin: 24
-                        verticalCenter: notchShape.verticalCenter
-                    }
-                    text: island.batteryEventText
-                    color: island.batteryCharging ? "#30d158" : "#e8e8ed"
-                    font.pixelSize: 16
-                    font.weight: Font.Medium
-                }
-
-                Text {
-                    anchors {
-                        right: parent.right
-                        rightMargin: 24
-                        verticalCenter: notchShape.verticalCenter
-                    }
-                    text: Math.round(island.batteryLevel * 100) + "%"
-                    color: island.batteryColor
-                    font.pixelSize: 17
-                    font.weight: Font.Medium
-                }
-            }
-
-            // ---------- TEMPORARY BLUETOOTH ----------
-            Item {
-                anchors.fill: parent
-                visible: island.displayMode === "bluetooth" && island.expanded
-
-                Text {
-                    anchors {
-                        left: parent.left
-                        leftMargin: 24
-                        verticalCenter: notchShape.verticalCenter
-                    }
-                    text: "Bluetooth"
-                    color: "#e8e8ed"
-                    font.pixelSize: 15
-                    font.weight: Font.Medium
-                }
-
-                Text {
-                    anchors {
-                        right: parent.right
-                        rightMargin: 24
-                        verticalCenter: notchShape.verticalCenter
-                    }
-                    width: island.wingWidth - 30
-                    text: island.bluetoothEventText
-                    color: "white"
-                    font.pixelSize: 15
-                    font.weight: Font.Medium
-                    horizontalAlignment: Text.AlignRight
-                    elide: Text.ElideRight
                 }
             }
 
