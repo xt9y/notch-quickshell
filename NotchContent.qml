@@ -48,10 +48,15 @@ Item {
 
     signal wifiPanelRequested()
     signal bluetoothPanelRequested()
+    signal calendarRequested()
+    signal weatherPanelRequested()
     signal detailBackRequested()
+    signal calendarBackRequested()
+    signal weatherBackRequested()
     signal statusRefreshRequested()
 
     UiSymbols { id: symbols }
+    WeatherService { id: weather }
 
     onVolumePercentChanged: {
         if (previousVolumePercent >= 0) {
@@ -163,9 +168,18 @@ Item {
                 anchors.rightMargin: 24
                 anchors.verticalCenter: parent.verticalCenter
                 text: Qt.formatDateTime(root.now, "ddd, d MMM")
-                color: "#b8b8bd"
+                color: dateMouse.containsMouse ? "#f5f5f7" : "#b8b8bd"
                 font.pixelSize: 17
                 font.weight: Font.Medium
+                Behavior on color { ColorAnimation { duration: 100 } }
+            }
+
+            MouseArea {
+                id: dateMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.calendarRequested()
             }
         }
     }
@@ -275,6 +289,75 @@ Item {
         }
     }
 
+    Item {
+        property bool active: root.displayMode === "weather" && root.expanded
+        anchors.fill: parent
+        opacity: active ? 1 : 0
+        scale: active ? 1 : 0.985
+        visible: opacity > 0.01
+        enabled: active
+        transformOrigin: Item.Top
+
+        Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+        Behavior on scale {
+            NumberAnimation {
+                duration: 185
+                easing.type: Easing.OutBack
+                easing.overshoot: 0.4
+            }
+        }
+
+        Item {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            width: root.leftWingWidth
+            height: root.normalHeight
+
+            Text {
+                anchors.left: parent.left
+                anchors.leftMargin: 24
+                anchors.verticalCenter: parent.verticalCenter
+                text: weather.apiKey === ""
+                    ? "Weather"
+                    : weather.ready ? Math.round(weather.tempC) + "°" : "Weather"
+                color: "#f5f5f7"
+                font.pixelSize: weather.ready ? 17 : 14
+                font.weight: Font.Medium
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.weatherPanelRequested()
+            }
+        }
+
+        Item {
+            anchors.right: parent.right
+            anchors.top: parent.top
+            width: root.rightWingWidth
+            height: root.normalHeight
+
+            Text {
+                anchors.right: parent.right
+                anchors.rightMargin: 24
+                anchors.verticalCenter: parent.verticalCenter
+                text: weather.apiKey === ""
+                    ? "Set key"
+                    : weather.ready ? "Rain " + weather.rainChance + "%" : (weather.loading ? "..." : "Open")
+                color: weather.errorText !== "" && !weather.ready ? "#ff9f0a" : "#b8b8bd"
+                font.pixelSize: 14
+                font.weight: Font.Medium
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.weatherPanelRequested()
+            }
+        }
+    }
+
     ConnectivityPanel {
         anchors.fill: parent
         active: (root.displayMode === "wifiPanel" || root.displayMode === "bluetoothPanel") && root.expanded
@@ -290,6 +373,20 @@ Item {
         active: root.displayMode === "soundPanel" && root.expanded
         onBackRequested: root.detailBackRequested()
         onStatusRefreshRequested: root.statusRefreshRequested()
+    }
+
+    CalendarPanel {
+        anchors.fill: parent
+        active: root.displayMode === "calendarPanel" && root.expanded
+        today: root.now
+        onBackRequested: root.calendarBackRequested()
+    }
+
+    WeatherPanel {
+        anchors.fill: parent
+        active: root.displayMode === "weatherPanel" && root.expanded
+        service: weather
+        onBackRequested: root.weatherBackRequested()
     }
 
     Rectangle {
@@ -310,17 +407,6 @@ Item {
             font.pixelSize: 22
             font.weight: Font.Medium
         }
-    }
-
-    BluetoothRouteButton {
-        z: 45
-        anchors.right: parent.right
-        anchors.rightMargin: 39
-        anchors.top: parent.top
-        anchors.topMargin: 108
-        active: root.expanded && root.displayMode === "bluetoothPanel"
-        deviceName: root.bluetoothDevice
-        onRouteChanged: root.statusRefreshRequested()
     }
 
     Item {
