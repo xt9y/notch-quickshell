@@ -29,11 +29,6 @@ Item {
         width: root.leftWingWidth
         height: root.normalHeight
 
-        Rectangle {
-            anchors.fill: parent
-            color: "#000000"
-        }
-
         Text {
             id: timeLabel
             anchors.left: parent.left
@@ -42,13 +37,13 @@ Item {
             text: root.timeText !== ""
                 ? root.timeText
                 : Qt.formatDateTime(root.now, "HH:mm")
-            color: "white"
+            color: leftMouse.containsMouse ? "#f5f5f7" : "white"
             font.pixelSize: 17
             font.weight: Font.Medium
+            Behavior on color { ColorAnimation { duration: 100 } }
         }
 
         Item {
-            id: batteryTarget
             anchors.left: timeLabel.right
             anchors.leftMargin: 10
             anchors.verticalCenter: parent.verticalCenter
@@ -97,13 +92,14 @@ Item {
                     color: root.batteryShellColor
                 }
             }
+        }
 
-            MouseArea {
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.settingsRequested()
-            }
+        MouseArea {
+            id: leftMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.settingsRequested()
         }
     }
 
@@ -113,11 +109,6 @@ Item {
         width: root.rightWingWidth
         height: root.normalHeight
 
-        Rectangle {
-            anchors.fill: parent
-            color: "#000000"
-        }
-
         Text {
             anchors.right: parent.right
             anchors.rightMargin: 24
@@ -125,18 +116,16 @@ Item {
             text: root.dateText !== ""
                 ? root.dateText
                 : Qt.formatDateTime(root.now, "ddd, d MMM")
-            color: dateMouse.containsMouse ? "#f5f5f7" : "#b8b8bd"
+            color: "#b8b8bd"
             font.pixelSize: 17
             font.weight: Font.Medium
-            Behavior on color { ColorAnimation { duration: 100 } }
         }
 
+        // Consume right-wing clicks so the removed Calendar action underneath cannot fire.
         MouseArea {
-            id: dateMouse
             anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: root.settingsRequested()
+            cursorShape: Qt.ArrowCursor
+            onClicked: function(mouse) { mouse.accepted = true }
         }
     }
 }
