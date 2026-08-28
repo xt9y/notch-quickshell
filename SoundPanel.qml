@@ -6,6 +6,7 @@ Item {
     id: root
 
     property bool active: false
+    signal backRequested()
     signal statusRefreshRequested()
 
     opacity: active ? 1 : 0
