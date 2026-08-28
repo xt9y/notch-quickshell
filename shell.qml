@@ -47,6 +47,10 @@ ShellRoot {
             property int cornerRadius: 8
             property bool expanded: hover.hovered
             property real wingWidth: (width - notchWidth) / 2
+            // In the idle state, rely entirely on the physical M2 notch. Keep
+            // the software surface alive while the width animation contracts,
+            // then remove it completely once we are fully collapsed.
+            property bool surfaceVisible: expanded || width > notchWidth + 0.5
 
             property var battery: UPower.displayDevice
             property real batteryLevel: battery && battery.ready
@@ -80,6 +84,7 @@ ShellRoot {
                 anchors.fill: parent
                 radius: island.cornerRadius
                 color: "#000000"
+                visible: island.surfaceVisible
             }
 
             Rectangle {
@@ -91,6 +96,7 @@ ShellRoot {
 
                 height: island.cornerRadius
                 color: "#000000"
+                visible: island.surfaceVisible
             }
 
             Item {
