@@ -34,9 +34,23 @@ Item {
     property bool previousVolumeMuted: false
     property string volumeAction: "up"
     property string volumeSymbol: volumeMuted || volumeAction === "mute"
-        ? "x"
-        : volumeAction === "down" ? "-" : "+"
+        ? symbols.mute
+        : volumeAction === "down" ? symbols.volumeDown : symbols.volumeUp
     property int brightnessPercent: 0
+
+    property bool wifiEnabled: false
+    property string wifiSsid: ""
+    property bool bluetoothPowered: false
+    property string bluetoothDevice: ""
+    property string bluetoothEventText: "Bluetooth"
+    property string detailPanelType: "wifi"
+
+    signal wifiPanelRequested()
+    signal bluetoothPanelRequested()
+    signal detailBackRequested()
+    signal statusRefreshRequested()
+
+    UiSymbols { id: symbols }
 
     onVolumePercentChanged: {
         if (previousVolumePercent >= 0) {
@@ -55,18 +69,6 @@ Item {
             volumeAction = volumePercent > 0 ? "up" : "down"
         previousVolumeMuted = volumeMuted
     }
-
-    property bool wifiEnabled: false
-    property string wifiSsid: ""
-    property bool bluetoothPowered: false
-    property string bluetoothDevice: ""
-    property string bluetoothEventText: "Bluetooth"
-    property string detailPanelType: "wifi"
-
-    signal wifiPanelRequested()
-    signal bluetoothPanelRequested()
-    signal detailBackRequested()
-    signal statusRefreshRequested()
 
     Item {
         property bool active: root.displayMode === "normal" && root.expanded
@@ -282,6 +284,48 @@ Item {
         onStatusRefreshRequested: root.statusRefreshRequested()
     }
 
+    SoundPanel {
+        anchors.fill: parent
+        active: root.displayMode === "soundPanel" && root.expanded
+        onBackRequested: root.detailBackRequested()
+        onStatusRefreshRequested: root.statusRefreshRequested()
+    }
+
+    // The detail panels historically owned their own back glyph. Cover that
+    // glyph and draw the shared design-system arrow at the corrected position.
+    Rectangle {
+        z: 40
+        x: 12
+        y: 0
+        width: 33
+        height: 48
+        color: "#000000"
+        visible: root.expanded &&
+            (root.displayMode === "wifiPanel" || root.displayMode === "bluetoothPanel")
+
+        Text {
+            anchors.centerIn: parent
+            anchors.verticalCenterOffset: 2
+            text: symbols.back
+            color: "#d1d1d6"
+            font.pixelSize: 22
+            font.weight: Font.Medium
+        }
+    }
+
+    // Connected Bluetooth devices are sorted first in ConnectivityPanel. This
+    // action therefore sits beside that row's existing forget button.
+    BluetoothRouteButton {
+        z: 45
+        anchors.right: parent.right
+        anchors.rightMargin: 39
+        anchors.top: parent.top
+        anchors.topMargin: 108
+        active: root.expanded && root.displayMode === "bluetoothPanel"
+        deviceName: root.bluetoothDevice
+        onRouteChanged: root.statusRefreshRequested()
+    }
+
     Item {
         property bool active: root.displayMode === "volume" && root.expanded
         anchors.fill: parent
@@ -326,7 +370,7 @@ Item {
                 anchors.right: parent.right
                 anchors.rightMargin: 24
                 anchors.verticalCenter: parent.verticalCenter
-                text: root.volumeMuted ? "-" : root.volumePercent
+                text: root.volumeMuted ? symbols.volumeDown : root.volumePercent
                 color: "#e8e8ed"
                 font.pixelSize: 17
                 font.weight: Font.Medium
@@ -361,7 +405,7 @@ Item {
                 anchors.left: parent.left
                 anchors.leftMargin: 24
                 anchors.verticalCenter: parent.verticalCenter
-                text: "*"
+                text: symbols.brightness
                 color: "white"
                 font.pixelSize: 21
                 font.weight: Font.DemiBold
