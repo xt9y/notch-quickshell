@@ -8,7 +8,6 @@ cache_home="${XDG_CACHE_HOME:-$HOME/.cache}"
 bin_home="$HOME/.local/bin"
 shortcut_rc="$config_home/kglobalshortcutsrc"
 
-# Runtime dependency for the Plasma volume shortcuts and notch volume observer.
 if ! command -v wpctl >/dev/null 2>&1; then
     if command -v dnf >/dev/null 2>&1; then
         echo "notch-quickshell: installing wpctl (WirePlumber)"
@@ -19,40 +18,61 @@ if ! command -v wpctl >/dev/null 2>&1; then
     fi
 fi
 
-# Install Plasma autostart entry.
 mkdir -p "$config_home/autostart"
 cp "$repo_root/plasma/notch-quickshell.desktop" \
    "$config_home/autostart/notch-quickshell.desktop"
 chmod 0644 "$config_home/autostart/notch-quickshell.desktop"
 
-# Install small volume helpers. KGlobalAccel repeats launch actions while the
-# media key is held, and each invocation changes volume by exactly one percent.
-# This produces the same constant/linear ramp on hold as the brightness keys.
+# Volume Up/Down are intentionally one-percent steps. Plasma/KGlobalAccel
+# repeats the launcher while the media key is held, producing a constant linear
+# ramp. Every action also touches volume-event so the notch reacts immediately.
 mkdir -p "$bin_home" "$cache_home/notch-quickshell"
 : > "$cache_home/notch-quickshell/volume-event"
 
 cat > "$bin_home/notch-volume-up" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 >/dev/null 2>&1 || true
 wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 1%+
 cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/notch-quickshell"
 mkdir -p "$cache_dir"
-printf '%s\n' "$(date +%s%N)" > "$cache_dir/volume-event"
+printf 'up %s\n' "$(date +%s%N)" > "$cache_dir/volume-event"
 EOF
 
 cat > "$bin_home/notch-volume-down" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 >/dev/null 2>&1 || true
 wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 1%-
 cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/notch-quickshell"
 mkdir -p "$cache_dir"
-printf '%s\n' "$(date +%s%N)" > "$cache_dir/volume-event"
+printf 'down %s\n' "$(date +%s%N)" > "$cache_dir/volume-event"
 EOF
 
-chmod 0755 "$bin_home/notch-volume-up" "$bin_home/notch-volume-down"
+cat > "$bin_home/notch-volume-mute" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/notch-quickshell"
+mkdir -p "$cache_dir"
+stamp="$cache_dir/mute-last"
+now_ms=$(( $(date +%s%N) / 1000000 ))
+last_ms=0
+[[ -r "$stamp" ]] && read -r last_ms < "$stamp" || true
+# Prevent a held mute key from rapidly toggling on/off, while ordinary presses
+# remain responsive.
+if (( now_ms - last_ms < 350 )); then
+    exit 0
+fi
+printf '%s\n' "$now_ms" > "$stamp"
+wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
+printf 'mute %s\n' "$(date +%s%N)" > "$cache_dir/volume-event"
+EOF
 
-# Plasma 6 command shortcuts are .desktop launchers registered with
-# KGlobalAccel. Put them in the same per-user location used by KMenuEdit/KCM.
+chmod 0755 \
+    "$bin_home/notch-volume-up" \
+    "$bin_home/notch-volume-down" \
+    "$bin_home/notch-volume-mute"
+
 kglobal_dir="$data_home/kglobalaccel"
 mkdir -p "$kglobal_dir"
 
@@ -76,13 +96,21 @@ StartupNotify=false
 X-KDE-GlobalAccel-CommandShortcut=true
 EOF
 
+cat > "$kglobal_dir/notch-volume-mute.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Notch Volume Mute
+Exec="$bin_home/notch-volume-mute"
+NoDisplay=true
+StartupNotify=false
+X-KDE-GlobalAccel-CommandShortcut=true
+EOF
+
 chmod 0644 \
     "$kglobal_dir/notch-volume-up.desktop" \
-    "$kglobal_dir/notch-volume-down.desktop"
+    "$kglobal_dir/notch-volume-down.desktop" \
+    "$kglobal_dir/notch-volume-mute.desktop"
 
-# Remove older manually-created custom wpctl volume launchers so they do not
-# compete for the same hardware media keys. Only entries explicitly executing
-# wpctl set-volume on @DEFAULT_AUDIO_SINK@ are touched.
 remove_shortcut_group() {
     local group="$1"
     [[ -f "$shortcut_rc" ]] || return 0
@@ -100,12 +128,12 @@ for shortcut_dir in "$data_home/kglobalaccel" "$data_home/applications"; do
     [[ -d "$shortcut_dir" ]] || continue
     while IFS= read -r -d '' desktop; do
         case "$(basename "$desktop")" in
-            notch-volume-up.desktop|notch-volume-down.desktop)
+            notch-volume-up.desktop|notch-volume-down.desktop|notch-volume-mute.desktop)
                 continue
                 ;;
         esac
 
-        if grep -Eq '^Exec=.*wpctl[[:space:]]+set-volume.*@DEFAULT_AUDIO_SINK@' "$desktop"; then
+        if grep -Eq '^Exec=.*wpctl[[:space:]]+(set-volume|set-mute).*@DEFAULT_AUDIO_SINK@' "$desktop"; then
             old_group="$(basename "$desktop")"
             rm -f "$desktop"
             remove_shortcut_group "$old_group"
@@ -115,12 +143,12 @@ for shortcut_dir in "$data_home/kglobalaccel" "$data_home/applications"; do
 done
 
 if command -v kwriteconfig6 >/dev/null 2>&1; then
-    # Release Plasma's standard volume actions, then assign the hardware keys
-    # to the managed repeatable launchers above.
     kwriteconfig6 --file "$shortcut_rc" --group kmix \
         --key increase_volume 'none,Volume Up,Increase Volume'
     kwriteconfig6 --file "$shortcut_rc" --group kmix \
         --key decrease_volume 'none,Volume Down,Decrease Volume'
+    kwriteconfig6 --file "$shortcut_rc" --group kmix \
+        --key mute 'none,Volume Mute,Mute'
 
     kwriteconfig6 --file "$shortcut_rc" --group notch-volume-up.desktop \
         --key _k_friendly_name 'Notch Volume Up'
@@ -131,11 +159,15 @@ if command -v kwriteconfig6 >/dev/null 2>&1; then
         --key _k_friendly_name 'Notch Volume Down'
     kwriteconfig6 --file "$shortcut_rc" --group notch-volume-down.desktop \
         --key _launch 'Volume Down,Volume Down,Notch Volume Down'
+
+    kwriteconfig6 --file "$shortcut_rc" --group notch-volume-mute.desktop \
+        --key _k_friendly_name 'Notch Volume Mute'
+    kwriteconfig6 --file "$shortcut_rc" --group notch-volume-mute.desktop \
+        --key _launch 'Volume Mute,Volume Mute,Notch Volume Mute'
 else
     echo "notch-quickshell: kwriteconfig6 missing; volume shortcuts were not registered" >&2
 fi
 
-# Refresh Plasma's application/shortcut registry without requiring logout.
 command -v kbuildsycoca6 >/dev/null 2>&1 && kbuildsycoca6 >/dev/null 2>&1 || true
 if command -v qdbus6 >/dev/null 2>&1; then
     qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
@@ -144,7 +176,6 @@ elif command -v dbus-send >/dev/null 2>&1; then
         >/dev/null 2>&1 || true
 fi
 
-# Clean up legacy config-update shell integration from older revisions.
 for rc_file in "$HOME/.bashrc" "$HOME/.zshrc"; do
     if [[ -f "$rc_file" ]]; then
         sed -i \
@@ -155,8 +186,6 @@ for rc_file in "$HOME/.bashrc" "$HOME/.zshrc"; do
     fi
 done
 
-# Restore the user's previous Kitty config if an older revision still left a
-# symlink pointing at this repo's now-removed kitty/kitty.conf.
 kitty_config="$config_home/kitty/kitty.conf"
 kitty_backup="$config_home/kitty/kitty.conf.notch-backup"
 if [[ -L "$kitty_config" ]]; then
