@@ -22,6 +22,14 @@ run_logged() {
     "$@" >> "$log_file" 2>&1
 }
 
+# hyprpm add always asks for confirmation, even for the official plugin repo.
+# config-update runs detached, so explicitly provide that confirmation and cap
+# the build time so a startup update can never wait forever for stdin/network.
+run_logged_confirmed() {
+    log "+ $* [auto-confirmed]"
+    timeout 15m "$@" <<< "y" >> "$log_file" 2>&1
+}
+
 if ! command -v hyprpm >/dev/null 2>&1; then
     log "hyprbars: hyprpm is not installed"
     exit 0
@@ -62,7 +70,9 @@ fi
 installed="$(hyprpm list 2>>"$log_file" || true)"
 if ! grep -qi 'hyprbars' <<< "$installed"; then
     log "hyprbars: adding official hyprland-plugins repository"
-    run_logged hyprpm add https://github.com/hyprwm/hyprland-plugins || true
+    if ! run_logged_confirmed hyprpm add https://github.com/hyprwm/hyprland-plugins; then
+        log "hyprbars: repository add failed or timed out"
+    fi
 
     # A freshly added repository may have been built against newly established
     # headers. Force one final metadata/build pass before enabling it.
