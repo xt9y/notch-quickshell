@@ -19,6 +19,8 @@ Item {
     enabled: active
     transformOrigin: Item.Top
 
+    UiSymbols { id: symbols }
+
     Behavior on opacity {
         NumberAnimation { duration: 115; easing.type: Easing.OutCubic }
     }
@@ -56,9 +58,9 @@ Item {
             height: 28
             Text {
                 anchors.centerIn: parent
-                text: "<<"
+                text: symbols.previous
                 color: root.player && root.player.canGoPrevious ? "white" : "#55555a"
-                font.pixelSize: 14
+                font.pixelSize: 18
                 font.weight: Font.Medium
             }
             MouseArea {
@@ -73,10 +75,9 @@ Item {
             height: 28
             Text {
                 anchors.centerIn: parent
-                anchors.verticalCenterOffset: 0
-                text: root.playing ? "||" : ">"
+                text: root.playing ? symbols.pause : symbols.play
                 color: root.player && root.player.canTogglePlaying ? "white" : "#55555a"
-                font.pixelSize: root.playing ? 12 : 14
+                font.pixelSize: root.playing ? 12 : 13
                 font.weight: Font.DemiBold
             }
             MouseArea {
@@ -91,9 +92,9 @@ Item {
             height: 28
             Text {
                 anchors.centerIn: parent
-                text: ">>"
+                text: symbols.next
                 color: root.player && root.player.canGoNext ? "white" : "#55555a"
-                font.pixelSize: 14
+                font.pixelSize: 18
                 font.weight: Font.Medium
             }
             MouseArea {
@@ -135,7 +136,7 @@ Item {
             Text {
                 anchors.centerIn: parent
                 visible: artImage.status !== Image.Ready
-                text: "M"
+                text: symbols.musicPlaceholder
                 color: "#636366"
                 font.pixelSize: 18
                 font.weight: Font.DemiBold
