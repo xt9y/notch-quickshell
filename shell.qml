@@ -35,7 +35,7 @@ ShellRoot {
 
             property int notchWidth: 170
             property int notchHeight: 48
-            property int collapsedVisualHeight: 46
+            property int collapsedVisualHeight: 44
             property int expandedWidth: 540
             property int cornerRadius: 13
             property bool expanded: hover.hovered
@@ -72,8 +72,8 @@ ShellRoot {
 
             // One exact notch silhouette: perfectly square along the display
             // edge, a flat bottom, and only the two lower corners rounded.
-            // The collapsed silhouette ends 2px higher to eliminate the tiny
-            // black lip that was visible below the physical notch.
+            // The collapsed silhouette is slightly shorter so no black lip is
+            // visible below the physical notch while idle.
             Shape {
                 id: notchShape
 
