@@ -73,7 +73,7 @@ Item {
             height: 28
             Text {
                 anchors.centerIn: parent
-                anchors.verticalCenterOffset: -1
+                anchors.verticalCenterOffset: 0
                 text: root.playing ? "||" : ">"
                 color: root.player && root.player.canTogglePlaying ? "white" : "#55555a"
                 font.pixelSize: root.playing ? 12 : 14
