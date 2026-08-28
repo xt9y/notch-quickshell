@@ -5,10 +5,11 @@ Item {
 
     property bool active: false
     property var settings: null
-    property var weather: null
+    property bool weatherConfigured: false
 
     signal closeRequested()
     signal calendarRequested()
+    signal weatherRequested()
 
     opacity: active ? 1 : 0
     scale: active ? 1 : 0.975
@@ -98,21 +99,11 @@ Item {
         })
     }
 
-    function focusWeatherKey() {
-        Qt.callLater(function() {
-            weatherKeyInput.forceActiveFocus()
-            weatherKeyInput.selectAll()
-        })
-    }
-
     onActiveChanged: {
         if (active && settings)
             timeZoneInput.text = settings.timeZone
-        if (!active) {
-            weatherKeyInput.text = ""
+        if (!active)
             timeZoneInput.focus = false
-            weatherKeyInput.focus = false
-        }
     }
 
     Item {
@@ -218,6 +209,60 @@ Item {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: root.calendarRequested()
+                }
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 54
+                radius: 10
+                color: weatherMouse.containsMouse ? "#151517" : "#111113"
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 13
+                    anchors.top: parent.top
+                    anchors.topMargin: 9
+                    text: "Weather API"
+                    color: "#e5e5ea"
+                    font.pixelSize: 13
+                    font.weight: Font.Medium
+                }
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 13
+                    anchors.right: weatherArrow.left
+                    anchors.rightMargin: 12
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 8
+                    text: root.weatherConfigured
+                        ? "Configured - open to change or reset"
+                        : "WeatherAPI.com or OpenWeather"
+                    color: "#636366"
+                    font.pixelSize: 10
+                    font.weight: Font.Medium
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    id: weatherArrow
+                    anchors.right: parent.right
+                    anchors.rightMargin: 14
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenterOffset: 1
+                    text: symbols.forward
+                    color: "#636366"
+                    font.pixelSize: 17
+                    font.weight: Font.Medium
+                }
+
+                MouseArea {
+                    id: weatherMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.weatherRequested()
                 }
             }
 
@@ -360,139 +405,12 @@ Item {
             Text {
                 width: parent.width
                 leftPadding: 8
-                topPadding: 5
-                text: root.weather && root.weather.apiKey !== ""
-                    ? "Weather API - " + root.weather.providerName()
-                    : "Weather API"
-                color: "#8e8e93"
-                font.pixelSize: 11
-                font.weight: Font.DemiBold
-            }
-
-            Rectangle {
-                id: weatherKeyField
-                width: parent.width
-                height: 42
-                radius: 10
-                color: "#111113"
-                border.width: 1
-                border.color: weatherKeyInput.activeFocus ? "#5a5a60" : "#242426"
-
-                Text {
-                    anchors.left: parent.left
-                    anchors.leftMargin: 13
-                    anchors.verticalCenter: parent.verticalCenter
-                    visible: weatherKeyInput.text.length === 0
-                    text: root.weather && root.weather.apiKey !== ""
-                        ? "Paste a replacement key"
-                        : "WeatherAPI.com or OpenWeather key"
-                    color: "#48484a"
-                    font.pixelSize: 12
-                }
-
-                TextInput {
-                    id: weatherKeyInput
-                    anchors.left: parent.left
-                    anchors.right: weatherKeySave.left
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    anchors.leftMargin: 13
-                    anchors.rightMargin: 12
-                    verticalAlignment: TextInput.AlignVCenter
-                    selectByMouse: true
-                    activeFocusOnTab: true
-                    echoMode: TextInput.Password
-                    passwordCharacter: "*"
-                    color: "#e5e5ea"
-                    selectionColor: "#48484a"
-                    selectedTextColor: "white"
-                    font.pixelSize: 12
-                    clip: true
-
-                    Keys.onReturnPressed: {
-                        if (root.weather)
-                            root.weather.saveApiKey(text)
-                        text = ""
-                    }
-                    Keys.onEnterPressed: {
-                        if (root.weather)
-                            root.weather.saveApiKey(text)
-                        text = ""
-                    }
-                }
-
-                Text {
-                    id: weatherKeySave
-                    anchors.right: parent.right
-                    anchors.rightMargin: 14
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: symbols.submit
-                    color: weatherKeySaveMouse.containsMouse ? "#f5f5f7" : "#8e8e93"
-                    font.pixelSize: 17
-                    font.weight: Font.Medium
-
-                    MouseArea {
-                        id: weatherKeySaveMouse
-                        anchors.fill: parent
-                        anchors.margins: -9
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            if (root.weather)
-                                root.weather.saveApiKey(weatherKeyInput.text)
-                            weatherKeyInput.text = ""
-                        }
-                    }
-                }
-
-                MouseArea {
-                    anchors.left: parent.left
-                    anchors.right: weatherKeySave.left
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    acceptedButtons: Qt.LeftButton
-                    cursorShape: Qt.IBeamCursor
-                    onPressed: function(mouse) {
-                        root.focusWeatherKey()
-                        mouse.accepted = false
-                    }
-                }
-            }
-
-            Rectangle {
-                width: parent.width
-                height: 42
-                radius: 10
-                visible: root.weather && root.weather.apiKey !== ""
-                color: clearWeatherMouse.containsMouse ? "#151517" : "#111113"
-
-                Text {
-                    anchors.left: parent.left
-                    anchors.leftMargin: 13
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Clear weather API key"
-                    color: "#d1d1d6"
-                    font.pixelSize: 12
-                    font.weight: Font.Medium
-                }
-
-                Text {
-                    anchors.right: parent.right
-                    anchors.rightMargin: 14
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: symbols.close
-                    color: "#636366"
-                    font.pixelSize: 13
-                    font.weight: Font.DemiBold
-                }
-
-                MouseArea {
-                    id: clearWeatherMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: if (root.weather) root.weather.clearApiKey()
-                }
+                text: root.settings && root.settings.timeZone !== ""
+                    ? "Current: " + root.settings.timeZone
+                    : "Current: system timezone"
+                color: "#48484a"
+                font.pixelSize: 10
+                font.weight: Font.Medium
             }
 
             Rectangle {
