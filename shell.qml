@@ -1,8 +1,21 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Services.UPower
 
 ShellRoot {
+    // Make this repository the source of truth for Hyprland as well.
+    // Every `qs -c notch` run ensures ~/.config/hypr/hyprland.lua points
+    // at hypr/hyprland.lua in this repo, then reloads Hyprland.
+    Process {
+        running: true
+        command: [
+            "bash",
+            Quickshell.shellDir + "/scripts/apply-hypr.sh",
+            Quickshell.shellDir
+        ]
+    }
+
     PanelWindow {
         id: panel
 
@@ -63,8 +76,6 @@ ShellRoot {
                 id: hover
             }
 
-            // Pitch-black surface joined directly to the physical notch.
-            // The top edge stays square; only the lower corners are rounded.
             Rectangle {
                 anchors.fill: parent
                 radius: island.cornerRadius
@@ -82,7 +93,6 @@ ShellRoot {
                 color: "#000000"
             }
 
-            // Left wing: time, then a compact battery directly beside it.
             Item {
                 id: leftWing
 
@@ -203,7 +213,6 @@ ShellRoot {
                 }
             }
 
-            // Right wing: date mirrors the time's 16px outer-edge spacing.
             Text {
                 anchors {
                     right: parent.right
