@@ -18,6 +18,7 @@ Item {
     property color batteryShellColor: "#d1d1d6"
 
     signal settingsRequested()
+    signal calendarRequested()
 
     anchors.fill: parent
     visible: active
@@ -116,16 +117,18 @@ Item {
             text: root.dateText !== ""
                 ? root.dateText
                 : Qt.formatDateTime(root.now, "ddd, d MMM")
-            color: "#b8b8bd"
+            color: dateMouse.containsMouse ? "#f5f5f7" : "#b8b8bd"
             font.pixelSize: 17
             font.weight: Font.Medium
+            Behavior on color { ColorAnimation { duration: 100 } }
         }
 
-        // Consume right-wing clicks so the removed Calendar action underneath cannot fire.
         MouseArea {
+            id: dateMouse
             anchors.fill: parent
-            cursorShape: Qt.ArrowCursor
-            onClicked: function(mouse) { mouse.accepted = true }
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.calendarRequested()
         }
     }
 }
