@@ -8,13 +8,19 @@ import Quickshell.Services.Mpris
 ShellRoot {
     PanelWindow {
         id: panel
+
+        property real displayScale: Screen.devicePixelRatio > 0
+            ? Screen.devicePixelRatio
+            : 1.0
+        property real designToLogical: 1.0 / displayScale
+
         anchors.top: true
         anchors.left: true
         anchors.right: true
         color: "transparent"
-        implicitHeight: 380
+        implicitHeight: Math.ceil(380 * designToLogical)
         exclusionMode: ExclusionMode.Normal
-        exclusiveZone: 49
+        exclusiveZone: Math.max(1, Math.round(49 * designToLogical))
         mask: Region { item: island }
 
         SystemClock {
@@ -25,6 +31,11 @@ ShellRoot {
         Item {
             id: island
 
+            // All dimensions below are physical design pixels. The outer item
+            // converts them to logical KDE/Wayland coordinates using the active
+            // screen's device-pixel ratio, so the software notch stays matched
+            // to the MacBook hardware notch at any Plasma scale.
+            property real unit: panel.designToLogical
             property int notchWidth: 170
             property int collapsedVisualHeight: 44
             property int normalHeight: 48
@@ -152,8 +163,10 @@ ShellRoot {
                     return 530
                 if (mode === "wifiPanel" || mode === "bluetoothPanel")
                     return 540
+                // 330 gives ~80 px on each side of the 170 px hardware notch,
+                // roughly half the previous wing width.
                 if (mode === "volume" || mode === "brightness")
-                    return 480
+                    return 330
                 if (mode === "battery")
                     return 420
                 return 540
@@ -193,23 +206,29 @@ ShellRoot {
                 return symmetricWing(displayMode)
             }
 
+            // targetWidth/Height and centerOffset stay in physical design pixels.
             property real targetWidth: notchWidth + targetLeftWing + targetRightWing
             property real targetHeight: expanded ? modeHeight(displayMode) : collapsedVisualHeight
             property real targetCenterOffset: (targetRightWing - targetLeftWing) / 2
             property real centerOffset: expanded ? targetCenterOffset : 0
+
+            // The actual outer item is in logical pixels. Convert its animated
+            // size back to design coordinates for all internal wing layout.
+            property real designWidth: unit > 0 ? width / unit : width
+            property real designHeight: unit > 0 ? height / unit : height
             property real actualLeftWing:
-                Math.max(0, width / 2 - notchWidth / 2 - centerOffset)
+                Math.max(0, designWidth / 2 - notchWidth / 2 - centerOffset)
             property real actualRightWing:
-                Math.max(0, width - notchWidth - actualLeftWing)
+                Math.max(0, designWidth - notchWidth - actualLeftWing)
             property real wingWidth: Math.min(actualLeftWing, actualRightWing)
             property bool largeMotion:
-                targetHeight > normalHeight || height > normalHeight + 1
+                targetHeight > normalHeight || designHeight > normalHeight + 1
 
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
-            anchors.horizontalCenterOffset: centerOffset
-            width: targetWidth
-            height: targetHeight
+            anchors.horizontalCenterOffset: centerOffset * unit
+            width: targetWidth * unit
+            height: targetHeight * unit
 
             function showTransient(mode, duration) {
                 transientMode = mode
@@ -484,10 +503,10 @@ ShellRoot {
 
             MouseArea {
                 z: 0
-                x: island.actualLeftWing
+                x: island.actualLeftWing * island.unit
                 y: 0
-                width: island.notchWidth
-                height: island.normalHeight
+                width: island.notchWidth * island.unit
+                height: island.normalHeight * island.unit
                 onClicked: island.cycleMode()
             }
 
@@ -658,87 +677,97 @@ ShellRoot {
                 }
             }
 
-            Shape {
-                anchors.fill: parent
-                antialiasing: true
+            // The visual surface remains in physical design coordinates and is
+            // uniformly scaled into the logical outer item. This also scales all
+            // text, radii, artwork, and detail panels consistently.
+            Item {
+                id: designSurface
+                width: island.designWidth
+                height: island.designHeight
+                scale: island.unit
+                transformOrigin: Item.TopLeft
 
-                ShapePath {
-                    strokeWidth: -1
-                    fillColor: "#000000"
-                    startX: 0
-                    startY: 0
+                Shape {
+                    anchors.fill: parent
+                    antialiasing: true
 
-                    PathLine { x: island.width; y: 0 }
-                    PathLine {
-                        x: island.width
-                        y: island.height - island.cornerRadius
+                    ShapePath {
+                        strokeWidth: -1
+                        fillColor: "#000000"
+                        startX: 0
+                        startY: 0
+
+                        PathLine { x: designSurface.width; y: 0 }
+                        PathLine {
+                            x: designSurface.width
+                            y: designSurface.height - island.cornerRadius
+                        }
+                        PathQuad {
+                            x: designSurface.width - island.cornerRadius
+                            y: designSurface.height
+                            controlX: designSurface.width
+                            controlY: designSurface.height
+                        }
+                        PathLine {
+                            x: island.cornerRadius
+                            y: designSurface.height
+                        }
+                        PathQuad {
+                            x: 0
+                            y: designSurface.height - island.cornerRadius
+                            controlX: 0
+                            controlY: designSurface.height
+                        }
+                        PathLine { x: 0; y: 0 }
                     }
-                    PathQuad {
-                        x: island.width - island.cornerRadius
-                        y: island.height
-                        controlX: island.width
-                        controlY: island.height
-                    }
-                    PathLine {
-                        x: island.cornerRadius
-                        y: island.height
-                    }
-                    PathQuad {
-                        x: 0
-                        y: island.height - island.cornerRadius
-                        controlX: 0
-                        controlY: island.height
-                    }
-                    PathLine { x: 0; y: 0 }
                 }
-            }
 
-            NotchContent {
-                z: 1
-                anchors.fill: parent
-                displayMode: island.displayMode
-                expanded: island.expanded
-                wingWidth: island.wingWidth
-                leftWingWidth: island.actualLeftWing
-                rightWingWidth: island.actualRightWing
-                normalHeight: island.normalHeight
-                now: clock.date
-                battery: island.battery
-                batteryLevel: island.batteryLevel
-                batteryCharging: island.batteryCharging
-                batteryColor: island.batteryColor
-                batteryShellColor: island.batteryShellColor
-                batteryEventText: island.batteryEventText
-                // Never draw the old idle music indicator on a closed notch.
-                musicPlaying: island.expanded && island.musicPlaying
-                musicSessionAvailable: island.musicSessionAvailable
-                activePlayer: island.activePlayer
-                musicTitle: island.musicTitle
-                musicArtist: island.musicArtist
-                musicArtSource: island.musicArtSource
-                musicPosition: island.musicPosition
-                musicLength: island.musicLength
-                musicProgress: island.musicProgress
-                volumePercent: island.volumePercent
-                volumeMuted: island.volumeMuted
-                brightnessPercent: island.brightnessPercent
-                wifiEnabled: island.wifiEnabled
-                wifiSsid: island.wifiSsid
-                bluetoothPowered: island.bluetoothPowered
-                bluetoothDevice: island.bluetoothDevice
-                bluetoothEventText: island.bluetoothEventText
-                detailPanelType: island.selectedMode === "bluetoothPanel"
-                    ? "bluetooth"
-                    : "wifi"
+                NotchContent {
+                    z: 1
+                    anchors.fill: parent
+                    displayMode: island.displayMode
+                    expanded: island.expanded
+                    wingWidth: island.wingWidth
+                    leftWingWidth: island.actualLeftWing
+                    rightWingWidth: island.actualRightWing
+                    normalHeight: island.normalHeight
+                    now: clock.date
+                    battery: island.battery
+                    batteryLevel: island.batteryLevel
+                    batteryCharging: island.batteryCharging
+                    batteryColor: island.batteryColor
+                    batteryShellColor: island.batteryShellColor
+                    batteryEventText: island.batteryEventText
+                    musicPlaying: island.expanded && island.musicPlaying
+                    musicSessionAvailable: island.musicSessionAvailable
+                    activePlayer: island.activePlayer
+                    musicTitle: island.musicTitle
+                    musicArtist: island.musicArtist
+                    musicArtSource: island.musicArtSource
+                    musicPosition: island.musicPosition
+                    musicLength: island.musicLength
+                    musicProgress: island.musicProgress
+                    volumePercent: island.volumePercent
+                    volumeMuted: island.volumeMuted
+                    brightnessPercent: island.brightnessPercent
+                    wifiEnabled: island.wifiEnabled
+                    wifiSsid: island.wifiSsid
+                    bluetoothPowered: island.bluetoothPowered
+                    bluetoothDevice: island.bluetoothDevice
+                    bluetoothEventText: island.bluetoothEventText
+                    detailPanelType: island.selectedMode === "bluetoothPanel"
+                        ? "bluetooth"
+                        : "wifi"
 
-                onWifiPanelRequested: island.openConnectivity("wifi")
-                onBluetoothPanelRequested: island.openConnectivity("bluetooth")
-                onDetailBackRequested: island.selectedMode = "connectivity"
-                onStatusRefreshRequested: {
-                    if (!wifiProbe.running)
-                        wifiProbe.running = true
-                    if (!bluetoothProbe.running)
-                        bluetoothProbe.running = true
+                    onWifiPanelRequested: island.openConnectivity("wifi")
+                    onBluetoothPanelRequested: island.openConnectivity("bluetooth")
+                    onDetailBackRequested: island.selectedMode = "connectivity"
+                    onStatusRefreshRequested: {
+                        if (!wifiProbe.running)
+                            wifiProbe.running = true
+                        if (!bluetoothProbe.running)
+                            bluetoothProbe.running = true
+                    }
                 }
             }
 
