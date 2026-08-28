@@ -7,6 +7,7 @@ source_kitty="$repo_root/kitty/kitty.conf"
 hyprpaper_template="$repo_root/hypr/hyprpaper.conf.in"
 wallpaper_dir="$repo_root/wallpaper"
 alias_file="$repo_root/shell/notch-aliases.sh"
+hyprbars_setup="$repo_root/scripts/setup-hyprbars.sh"
 config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
 
 hypr_dir="$config_home/hypr"
@@ -133,8 +134,14 @@ if [[ -f "$alias_file" ]]; then
     fi
 fi
 
+# Load the official hyprbars plugin before re-reading hyprland.lua. The Lua
+# config guards its plugin calls, so a failed plugin build cannot break Hyprland.
+if [[ -f "$hyprbars_setup" && -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+    bash "$hyprbars_setup" || true
+fi
+
 # Hyprland already watches its config, but force a reload here so a freshly
-# installed symlink is applied immediately. This is harmless on later runs.
+# installed symlink/plugin is applied immediately. This is harmless on later runs.
 if command -v hyprctl >/dev/null 2>&1 && [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
     hyprctl reload >/dev/null 2>&1 || true
 fi
