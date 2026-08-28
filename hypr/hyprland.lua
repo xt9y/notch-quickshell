@@ -113,6 +113,83 @@ hl.config({
     },
 })
 
+----------------------------------
+---- MACOS WINDOW DECORATIONS ----
+----------------------------------
+
+-- hyprbars is loaded by scripts/setup-hyprbars.sh. Guard the plugin-specific
+-- API so Hyprland remains usable even if the plugin cannot be built/loaded.
+if hl.plugin.hyprbars ~= nil then
+    hl.config({
+        plugin = {
+            hyprbars = {
+                enabled = true,
+
+                -- macOS dark title-bar proportions.
+                bar_height = 28,
+                bar_color = "rgba(282828f2)",
+                bar_blur = true,
+                bar_part_of_window = true,
+                bar_precedence_over_border = true,
+
+                -- macOS-like centered title typography. Fontconfig falls back
+                -- automatically when SF Pro Display is not installed.
+                col = {
+                    text = "rgba(e7e7e7ff)",
+                },
+                bar_title_enabled = true,
+                bar_text_size = 11,
+                bar_text_weight = 500,
+                bar_text_font = "SF Pro Display",
+                bar_text_align = "center",
+
+                -- Apple traffic lights: 12px circles with compact left spacing.
+                bar_buttons_alignment = "left",
+                bar_padding = 12,
+                bar_button_padding = 7,
+                icon_on_hover = true,
+                inactive_button_color = "rgb(777777)",
+
+                on_double_click = "hyprctl dispatch fullscreen 1",
+            },
+        },
+    })
+
+    -- Red: close. The dark glyph only appears while hovering the traffic light.
+    hl.plugin.hyprbars.add_button({
+        bg_color = "rgb(ff5f57)",
+        fg_color = "rgb(5b1110)",
+        size = 12,
+        icon = "×",
+        action = "hyprctl dispatch killactive",
+    })
+
+    -- Yellow: emulate macOS minimize using a hidden Hyprland special workspace.
+    hl.plugin.hyprbars.add_button({
+        bg_color = "rgb(febc2e)",
+        fg_color = "rgb(6b4800)",
+        size = 12,
+        icon = "−",
+        action = "hyprctl dispatch movetoworkspacesilent special:minimized",
+    })
+
+    -- Green: fullscreen/zoom.
+    hl.plugin.hyprbars.add_button({
+        bg_color = "rgb(28c840)",
+        fg_color = "rgb(075d18)",
+        size = 12,
+        icon = "⤢",
+        action = "hyprctl dispatch fullscreen 1",
+    })
+
+    -- Helper windows must not receive a decorative title bar.
+    hl.window_rule({
+        name = "xwayland-video-bridge-no-titlebar",
+        match = { class = "xwaylandvideobridge" },
+        ["hyprbars:no_bar"] = true,
+    })
+end
+
 ----------------
 ---- GESTURES ----
 ----------------
@@ -134,6 +211,9 @@ hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
 hl.bind(mainMod .. " + J", hl.dsp.layout("togglesplit"))
+
+-- Show/hide windows sent to the yellow traffic-light "minimized" workspace.
+hl.bind(mainMod .. " + N", hl.dsp.workspace.toggle_special("minimized"))
 
 hl.bind(mainMod .. " + left", hl.dsp.focus({ direction = "left" }))
 hl.bind(mainMod .. " + right", hl.dsp.focus({ direction = "right" }))
