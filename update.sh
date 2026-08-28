@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")"
-git pull --ff-only
+repo_root="$(cd "$(dirname "$0")" && pwd)"
+cd "$repo_root"
 
-echo "Updated notch-quickshell. A running Quickshell instance watches this config and reloads changed files automatically."
+git pull --ff-only
+bash "$repo_root/scripts/apply-hypr.sh" "$repo_root"
+
+echo "Updated notch-quickshell and applied the repo-managed Hyprland config."
+echo "A running Quickshell instance will reload shell.qml automatically."
