@@ -291,13 +291,14 @@ Item {
         onStatusRefreshRequested: root.statusRefreshRequested()
     }
 
-    // The detail panels historically owned their own back glyph. Cover that
-    // glyph and draw the shared design-system arrow at the corrected position.
+    // Keep the shared back arrow slightly lower than the detail-panel glyph,
+    // but mask only the glyph itself. The old wider mask overlapped the first
+    // pixels of the Wi-Fi/Bluetooth title.
     Rectangle {
         z: 40
-        x: 12
+        x: 15
         y: 0
-        width: 33
+        width: 22
         height: 48
         color: "#000000"
         visible: root.expanded &&
