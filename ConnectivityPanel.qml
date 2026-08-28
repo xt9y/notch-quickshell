@@ -440,15 +440,9 @@ Item {
             boundsMovement: Flickable.FollowBoundsBehavior
             flickDeceleration: 3000
             maximumFlickVelocity: 4300
-            rebound: Transition {
-                NumberAnimation { properties: "x,y"; duration: 300; easing.type: Easing.OutBack; easing.overshoot: 0.2 }
-            }
-            add: Transition {
-                NumberAnimation { properties: "opacity,scale"; from: 0; to: 1; duration: 170; easing.type: Easing.OutBack }
-            }
-            displaced: Transition {
-                NumberAnimation { properties: "x,y"; duration: 180; easing.type: Easing.OutCubic }
-            }
+            rebound: Transition { NumberAnimation { properties: "x,y"; duration: 300; easing.type: Easing.OutBack; easing.overshoot: 0.2 } }
+            add: Transition { NumberAnimation { properties: "opacity,scale"; from: 0; to: 1; duration: 170; easing.type: Easing.OutBack } }
+            displaced: Transition { NumberAnimation { properties: "x,y"; duration: 180; easing.type: Easing.OutCubic } }
 
             delegate: Item {
                 id: wifiRow
@@ -472,30 +466,9 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     width: 17
                     height: 14
-                    Rectangle {
-                        anchors.left: parent.left
-                        anchors.bottom: parent.bottom
-                        width: 3
-                        height: 4
-                        radius: 1.5
-                        color: model.strength > 0 ? (model.active ? "#30d158" : "#d1d1d6") : "#3a3a3c"
-                    }
-                    Rectangle {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.bottom: parent.bottom
-                        width: 3
-                        height: 8
-                        radius: 1.5
-                        color: model.strength >= 40 ? (model.active ? "#30d158" : "#d1d1d6") : "#3a3a3c"
-                    }
-                    Rectangle {
-                        anchors.right: parent.right
-                        anchors.bottom: parent.bottom
-                        width: 3
-                        height: 12
-                        radius: 1.5
-                        color: model.strength >= 70 ? (model.active ? "#30d158" : "#d1d1d6") : "#3a3a3c"
-                    }
+                    Rectangle { anchors.left: parent.left; anchors.bottom: parent.bottom; width: 3; height: 4; radius: 1.5; color: model.strength > 0 ? (model.active ? "#30d158" : "#d1d1d6") : "#3a3a3c" }
+                    Rectangle { anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; width: 3; height: 8; radius: 1.5; color: model.strength >= 40 ? (model.active ? "#30d158" : "#d1d1d6") : "#3a3a3c" }
+                    Rectangle { anchors.right: parent.right; anchors.bottom: parent.bottom; width: 3; height: 12; radius: 1.5; color: model.strength >= 70 ? (model.active ? "#30d158" : "#d1d1d6") : "#3a3a3c" }
                 }
                 Text {
                     anchors.left: signalIcon.right
@@ -526,22 +499,8 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     height: 30
                     visible: wifiRow.editing
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 8
-                        color: "#1c1c1e"
-                        border.width: 1
-                        border.color: passwordInput.activeFocus ? "#5a5a60" : "#2c2c2e"
-                    }
-                    Text {
-                        anchors.left: parent.left
-                        anchors.leftMargin: 10
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: passwordInput.text.length === 0
-                        text: "Password"
-                        color: "#636366"
-                        font.pixelSize: 13
-                    }
+                    Rectangle { anchors.fill: parent; radius: 8; color: "#1c1c1e"; border.width: 1; border.color: passwordInput.activeFocus ? "#5a5a60" : "#2c2c2e" }
+                    Text { anchors.left: parent.left; anchors.leftMargin: 10; anchors.verticalCenter: parent.verticalCenter; visible: passwordInput.text.length === 0; text: "Password"; color: "#636366"; font.pixelSize: 13 }
                     TextInput {
                         id: passwordInput
                         anchors.left: parent.left
@@ -567,12 +526,7 @@ Item {
                         text: "↵"
                         color: "#b8b8bd"
                         font.pixelSize: 15
-                        MouseArea {
-                            anchors.fill: parent
-                            anchors.margins: -7
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: { root.submitWifiPassword(model.ssid, passwordInput.text); passwordInput.text = "" }
-                        }
+                        MouseArea { anchors.fill: parent; anchors.margins: -7; cursorShape: Qt.PointingHandCursor; onClicked: { root.submitWifiPassword(model.ssid, passwordInput.text); passwordInput.text = "" } }
                     }
                 }
                 Text {
@@ -585,14 +539,7 @@ Item {
                     color: forgetWifiMouse.containsMouse ? "#b8b8bd" : "#636366"
                     font.pixelSize: 17
                     font.weight: Font.Medium
-                    MouseArea {
-                        id: forgetWifiMouse
-                        anchors.fill: parent
-                        anchors.margins: -9
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.forgetWifi(model.uuid)
-                    }
+                    MouseArea { id: forgetWifiMouse; anchors.fill: parent; anchors.margins: -9; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.forgetWifi(model.uuid) }
                 }
                 HoverHandler { id: rowHover }
             }
@@ -631,25 +578,15 @@ Item {
             boundsMovement: Flickable.FollowBoundsBehavior
             flickDeceleration: 3000
             maximumFlickVelocity: 4300
-            rebound: Transition {
-                NumberAnimation { properties: "x,y"; duration: 300; easing.type: Easing.OutBack; easing.overshoot: 0.2 }
-            }
-            add: Transition {
-                NumberAnimation { properties: "opacity,scale"; from: 0; to: 1; duration: 170; easing.type: Easing.OutBack }
-            }
-            displaced: Transition {
-                NumberAnimation { properties: "x,y"; duration: 180; easing.type: Easing.OutCubic }
-            }
+            rebound: Transition { NumberAnimation { properties: "x,y"; duration: 300; easing.type: Easing.OutBack; easing.overshoot: 0.2 } }
+            add: Transition { NumberAnimation { properties: "opacity,scale"; from: 0; to: 1; duration: 170; easing.type: Easing.OutBack } }
+            displaced: Transition { NumberAnimation { properties: "x,y"; duration: 180; easing.type: Easing.OutCubic } }
 
             delegate: Item {
                 id: btRow
                 width: bluetoothList.width
                 height: 46
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 10
-                    color: btHover.hovered ? "#161618" : "transparent"
-                }
+                Rectangle { anchors.fill: parent; radius: 10; color: btHover.hovered ? "#161618" : "transparent" }
                 Rectangle {
                     anchors.left: parent.left
                     anchors.leftMargin: 13
@@ -683,12 +620,7 @@ Item {
                     font.pixelSize: 10
                     font.weight: Font.Medium
                 }
-                MouseArea {
-                    z: 1
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.selectBluetooth(model.address, model.paired, model.connected)
-                }
+                MouseArea { z: 1; anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.selectBluetooth(model.address, model.paired, model.connected) }
                 Text {
                     z: 3
                     anchors.right: parent.right
@@ -699,14 +631,7 @@ Item {
                     color: forgetBtMouse.containsMouse ? "#b8b8bd" : "#636366"
                     font.pixelSize: 17
                     font.weight: Font.Medium
-                    MouseArea {
-                        id: forgetBtMouse
-                        anchors.fill: parent
-                        anchors.margins: -9
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.forgetBluetooth(model.address)
-                    }
+                    MouseArea { id: forgetBtMouse; anchors.fill: parent; anchors.margins: -9; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.forgetBluetooth(model.address) }
                 }
                 HoverHandler { id: btHover }
             }
@@ -724,14 +649,11 @@ Item {
         id: airplaneProbe
         command: [
             "bash", "-lc",
-            "command -v rfkill >/dev/null 2>&1 || { printf 'unavailable\\nunblocked\\n'; exit 0; }; read total blocked <<<\"$(rfkill -n -o SOFT 2>/dev/null | awk '{t++; if ($1 == \\\"blocked\\\") b++} END {print t+0, b+0}')\"; if [ \"$total\" -gt 0 ]; then printf 'available\\n'; [ \"$blocked\" -eq \"$total\" ] && printf 'blocked\\n' || printf 'unblocked\\n'; else printf 'unavailable\\nunblocked\\n'; fi"
+            "command -v rfkill >/dev/null 2>&1 || { printf 'unavailable\\nunblocked\\n'; exit 0; }; read -r total blocked <<<$(rfkill -n -o SOFT 2>/dev/null | awk '{t++; if ($1 ~ /^blocked$/) b++} END {print t+0, b+0}'); if (( total > 0 )); then printf 'available\\n'; if (( blocked == total )); then printf 'blocked\\n'; else printf 'unblocked\\n'; fi; else printf 'unavailable\\nunblocked\\n'; fi"
         ]
         stdout: StdioCollector { onStreamFinished: root.consumeAirplane(text) }
     }
-    Process {
-        id: wifiListProbe
-        stdout: StdioCollector { onStreamFinished: root.consumeWifiList(text) }
-    }
+    Process { id: wifiListProbe; stdout: StdioCollector { onStreamFinished: root.consumeWifiList(text) } }
     Process {
         id: wifiAction
         onRunningChanged: if (!running) {
@@ -741,13 +663,7 @@ Item {
             root.statusRefreshRequested()
         }
     }
-    Process {
-        id: wifiForget
-        onRunningChanged: if (!running) {
-            root.refreshWifi(true)
-            root.statusRefreshRequested()
-        }
-    }
+    Process { id: wifiForget; onRunningChanged: if (!running) { root.refreshWifi(true); root.statusRefreshRequested() } }
     Process {
         id: bluetoothListProbe
         command: [
@@ -756,11 +672,7 @@ Item {
         ]
         stdout: StdioCollector { onStreamFinished: root.consumeBluetoothList(text) }
     }
-    Process {
-        id: bluetoothScan
-        command: ["bluetoothctl", "--timeout", "5", "scan", "on"]
-        onRunningChanged: if (!running) root.refreshBluetooth(false)
-    }
+    Process { id: bluetoothScan; command: ["bluetoothctl", "--timeout", "5", "scan", "on"]; onRunningChanged: if (!running) root.refreshBluetooth(false) }
     Process {
         id: bluetoothAction
         onRunningChanged: if (!running) {
@@ -769,35 +681,8 @@ Item {
             root.statusRefreshRequested()
         }
     }
-    Process {
-        id: bluetoothForget
-        onRunningChanged: if (!running) {
-            root.refreshBluetooth(true)
-            root.statusRefreshRequested()
-        }
-    }
-    Process {
-        id: radioAction
-        onRunningChanged: if (!running) {
-            root.refreshAirplane()
-            root.statusRefreshRequested()
-            root.refreshCurrent(true)
-        }
-    }
-    Process {
-        id: wifiRadioAction
-        onRunningChanged: if (!running) {
-            root.refreshAirplane()
-            root.statusRefreshRequested()
-            root.refreshWifi(true)
-        }
-    }
-    Process {
-        id: bluetoothRadioAction
-        onRunningChanged: if (!running) {
-            root.refreshAirplane()
-            root.statusRefreshRequested()
-            root.refreshBluetooth(true)
-        }
-    }
+    Process { id: bluetoothForget; onRunningChanged: if (!running) { root.refreshBluetooth(true); root.statusRefreshRequested() } }
+    Process { id: radioAction; onRunningChanged: if (!running) { root.refreshAirplane(); root.statusRefreshRequested(); root.refreshCurrent(true) } }
+    Process { id: wifiRadioAction; onRunningChanged: if (!running) { root.refreshAirplane(); root.statusRefreshRequested(); root.refreshWifi(true) } }
+    Process { id: bluetoothRadioAction; onRunningChanged: if (!running) { root.refreshAirplane(); root.statusRefreshRequested(); root.refreshBluetooth(true) } }
 }
