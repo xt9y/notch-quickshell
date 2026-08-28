@@ -13,7 +13,7 @@ hl.monitor({
 
     -- Keep tiled windows just below the physical MacBook notch.
     reserved_area = {
-        top = 34,
+        top = 30,
         bottom = 0,
         left = 0,
         right = 0,
@@ -43,8 +43,8 @@ end)
 ---- ENVIRONMENT VARIABLES ----
 -------------------------------
 
-hl.env("XCURSOR_SIZE", "24")
-hl.env("HYPRCURSOR_SIZE", "24")
+hl.env("XCURSOR_SIZE", "16")
+hl.env("HYPRCURSOR_SIZE", "16")
 
 -----------------------
 ---- LOOK AND FEEL ----
