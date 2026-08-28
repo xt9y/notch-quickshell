@@ -4,44 +4,68 @@ import Quickshell.Io
 Item {
     id: root
 
-    property string bluetoothDevice: ""
-    property string lastBluetoothDevice: ""
-    property bool initialized: false
+    property bool bluetoothInitialized: false
+    property bool bluetoothConnected: false
 
     width: 0
     height: 0
     visible: false
 
     function scheduleRepair(delay) {
-        repairTimer.interval = delay || 700
+        repairTimer.interval = delay === undefined ? 650 : delay
         repairTimer.restart()
     }
 
-    onBluetoothDeviceChanged: {
-        if (!initialized) {
-            initialized = true
-            lastBluetoothDevice = bluetoothDevice
+    function consumeBluetooth(raw) {
+        var connected = raw.trim() === "yes"
+
+        if (!bluetoothInitialized) {
+            bluetoothInitialized = true
+            bluetoothConnected = connected
             return
         }
 
-        var disconnected = lastBluetoothDevice !== "" && bluetoothDevice === ""
-        lastBluetoothDevice = bluetoothDevice
-        if (disconnected)
-            scheduleRepair(650)
+        var wasConnected = bluetoothConnected
+        bluetoothConnected = connected
+        if (wasConnected && !connected)
+            scheduleRepair(500)
     }
 
     Component.onCompleted: startupRepair.restart()
 
     Timer {
         id: startupRepair
-        interval: 2600
+        interval: 2400
         repeat: false
         onTriggered: root.scheduleRepair(0)
     }
 
     Timer {
-        id: repairTimer
         interval: 700
+        repeat: true
+        running: true
+        triggeredOnStart: true
+        onTriggered: {
+            if (!bluetoothProbe.running)
+                bluetoothProbe.running = true
+        }
+    }
+
+    Process {
+        id: bluetoothProbe
+        command: [
+            "bash",
+            "-lc",
+            "if command -v bluetoothctl >/dev/null 2>&1 && bluetoothctl devices Connected 2>/dev/null | grep -q '^Device '; then printf 'yes'; else printf 'no'; fi"
+        ]
+        stdout: StdioCollector {
+            onStreamFinished: root.consumeBluetooth(text)
+        }
+    }
+
+    Timer {
+        id: repairTimer
+        interval: 650
         repeat: false
         onTriggered: {
             if (!repairProcess.running)
@@ -61,7 +85,7 @@ Item {
             "if [ -n \"$current\" ] && ! printf '%s\\n' \"$info\" | grep -Eiq 'bluez|bluetooth'; then " +
             "wpctl set-default \"$current\" >/dev/null 2>&1 || true; exit 0; fi; " +
             "fallback=$(wpctl status -n 2>/dev/null | sed -n '/Sinks:/,/Sources:/p' | grep -viE 'bluez|bluetooth|dummy|auto_null' | sed -n 's/^[^0-9]*\\([0-9][0-9]*\\)\\..*/\\1/p' | head -n1); " +
-            "[ -n \"$fallback\" ] && wpctl set-default \"$fallback\" >/dev/null 2>&1 || true"
+            "if [ -n \"$fallback\" ]; then wpctl set-default \"$fallback\" >/dev/null 2>&1 || true; fi"
         ]
     }
 }
