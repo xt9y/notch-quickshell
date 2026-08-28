@@ -8,7 +8,3 @@ Features:
 - Music player (MPRIS)
 - Battery status via UPower
 - Wallpaper integration
-
-## Demo
-
-![Notch demo](demo.webp)
