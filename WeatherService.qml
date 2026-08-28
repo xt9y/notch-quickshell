@@ -98,7 +98,6 @@ Item {
     function consumeProvider(raw) {
         var detected = (raw || "").trim()
         validating = false
-        detectKey.environment = ({})
 
         if (detected !== "weatherapi" && detected !== "openweather") {
             pendingKey = ""
@@ -294,8 +293,10 @@ Item {
         stdout: StdioCollector {
             onStreamFinished: root.consumeProvider(text)
         }
-        onRunningChanged: if (!running)
+        onRunningChanged: if (!running) {
+            environment = ({})
             root.validating = false
+        }
     }
 
     Process {
