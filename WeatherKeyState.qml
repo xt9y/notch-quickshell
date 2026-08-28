@@ -30,7 +30,7 @@ Item {
             var base = Quickshell.env("XDG_CONFIG_HOME")
             if (!base || base === "")
                 base = (Quickshell.env("HOME") || "") + "/.config"
-            return base + "/notch-quickshell/weather-api-key"
+            return base + "/notch-quickshell/weather-provider"
         }
         watchChanges: true
         onFileChanged: {
@@ -44,8 +44,11 @@ Item {
         command: [
             "bash",
             "-lc",
-            "file=\"${XDG_CONFIG_HOME:-$HOME/.config}/notch-quickshell/weather-api-key\"; " +
-            "if [ -s \"$file\" ] && grep -q '[^[:space:]]' \"$file\" 2>/dev/null; then printf yes; else printf no; fi"
+            "dir=\"${XDG_CONFIG_HOME:-$HOME/.config}/notch-quickshell\"; " +
+            "key=''; provider=''; " +
+            "[ -r \"$dir/weather-api-key\" ] && key=$(cat \"$dir/weather-api-key\"); " +
+            "[ -r \"$dir/weather-provider\" ] && provider=$(cat \"$dir/weather-provider\"); " +
+            "if [ -n \"$key\" ] && { [ \"$provider\" = weatherapi ] || [ \"$provider\" = openweather ]; }; then printf yes; else printf no; fi"
         ]
         stdout: StdioCollector {
             onStreamFinished: root.configured = text.trim() === "yes"
