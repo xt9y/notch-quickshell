@@ -34,8 +34,8 @@ Item {
     property bool previousVolumeMuted: false
     property string volumeAction: "up"
     property string volumeSymbol: volumeMuted || volumeAction === "mute"
-        ? "🔇"
-        : volumeAction === "down" ? "🔉" : "🔊"
+        ? "x"
+        : volumeAction === "down" ? "-" : "+"
     property int brightnessPercent: 0
 
     onVolumePercentChanged: {
@@ -311,8 +311,8 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: root.volumeSymbol
                 color: "white"
-                font.pixelSize: 18
-                font.weight: Font.Medium
+                font.pixelSize: 21
+                font.weight: Font.DemiBold
             }
         }
 
@@ -326,7 +326,7 @@ Item {
                 anchors.right: parent.right
                 anchors.rightMargin: 24
                 anchors.verticalCenter: parent.verticalCenter
-                text: root.volumeMuted ? "—" : root.volumePercent
+                text: root.volumeMuted ? "-" : root.volumePercent
                 color: "#e8e8ed"
                 font.pixelSize: 17
                 font.weight: Font.Medium
@@ -361,9 +361,10 @@ Item {
                 anchors.left: parent.left
                 anchors.leftMargin: 24
                 anchors.verticalCenter: parent.verticalCenter
-                text: "☀"
+                text: "*"
                 color: "white"
-                font.pixelSize: 18
+                font.pixelSize: 21
+                font.weight: Font.DemiBold
             }
         }
 
