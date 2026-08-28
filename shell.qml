@@ -19,7 +19,7 @@ ShellRoot {
         anchors.left: true
         anchors.right: true
         color: "transparent"
-        implicitHeight: Math.ceil(380 * designToLogical * uiScale)
+        implicitHeight: Math.ceil(500 * designToLogical * uiScale)
         exclusionMode: ExclusionMode.Normal
         exclusiveZone: Math.max(1, Math.round(49 * designToLogical * uiScale))
         mask: Region { item: island }
@@ -38,6 +38,7 @@ ShellRoot {
             property int normalHeight: 48
             property int musicHeight: 132
             property int detailHeight: 360
+            property int weatherDetailHeight: 480
             property int bluetoothEventHeight: 96
             property int cornerRadius: 13
 
@@ -159,6 +160,10 @@ ShellRoot {
             function modeWidth(mode) {
                 if (mode === "music")
                     return 570
+                if (mode === "weatherPanel")
+                    return 560
+                if (mode === "calendarPanel")
+                    return 540
                 if (mode === "wifiPanel" || mode === "bluetoothPanel" || mode === "soundPanel")
                     return 540
                 if (mode === "volume" || mode === "brightness")
@@ -171,7 +176,9 @@ ShellRoot {
             function modeHeight(mode) {
                 if (mode === "music")
                     return musicHeight
-                if (mode === "wifiPanel" || mode === "bluetoothPanel" || mode === "soundPanel")
+                if (mode === "weatherPanel")
+                    return weatherDetailHeight
+                if (mode === "calendarPanel" || mode === "wifiPanel" || mode === "bluetoothPanel" || mode === "soundPanel")
                     return detailHeight
                 if (mode === "bluetooth")
                     return bluetoothEventHeight
@@ -246,6 +253,10 @@ ShellRoot {
                     selectedMode = "connectivity"
                 else if (selectedMode === "connectivity")
                     selectedMode = "soundPanel"
+                else if (selectedMode === "soundPanel")
+                    selectedMode = "weather"
+                else if (selectedMode === "weather")
+                    selectedMode = "normal"
                 else
                     selectedMode = "normal"
             }
@@ -801,7 +812,19 @@ ShellRoot {
 
                     onWifiPanelRequested: island.openConnectivity("wifi")
                     onBluetoothPanelRequested: island.openConnectivity("bluetooth")
+                    onCalendarRequested: {
+                        transientTimer.stop()
+                        island.transientMode = ""
+                        island.selectedMode = "calendarPanel"
+                    }
+                    onWeatherPanelRequested: {
+                        transientTimer.stop()
+                        island.transientMode = ""
+                        island.selectedMode = "weatherPanel"
+                    }
                     onDetailBackRequested: island.selectedMode = "connectivity"
+                    onCalendarBackRequested: island.selectedMode = "normal"
+                    onWeatherBackRequested: island.selectedMode = "weather"
                     onStatusRefreshRequested: {
                         if (!volumeProbe.running)
                             volumeProbe.running = true
