@@ -248,14 +248,14 @@ ShellRoot {
 
             function cycleMode() {
                 if (selectedMode === "normal")
+                    selectedMode = "weather"
+                else if (selectedMode === "weather")
                     selectedMode = musicPlaying ? "music" : "connectivity"
                 else if (selectedMode === "music")
                     selectedMode = "connectivity"
                 else if (selectedMode === "connectivity")
                     selectedMode = "soundPanel"
                 else if (selectedMode === "soundPanel")
-                    selectedMode = "weather"
-                else if (selectedMode === "weather")
                     selectedMode = "normal"
                 else
                     selectedMode = "normal"
