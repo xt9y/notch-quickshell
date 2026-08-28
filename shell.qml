@@ -24,7 +24,8 @@ ShellRoot {
         exclusiveZone: Math.max(1, Math.round(49 * designToLogical * uiScale))
         mask: Region { item: island }
         focusable: island.displayMode === "weatherPanel" ||
-            island.displayMode === "wifiPanel"
+            island.displayMode === "wifiPanel" ||
+            island.displayMode === "settingsPanel"
 
         SystemClock {
             id: clock
@@ -33,6 +34,10 @@ ShellRoot {
 
         WeatherKeyState {
             id: weatherKeyState
+        }
+
+        SettingsService {
+            id: settingsService
         }
 
         Item {
@@ -44,6 +49,7 @@ ShellRoot {
             property int normalHeight: 48
             property int musicHeight: 132
             property int detailHeight: 360
+            property int settingsHeight: 460
             property int weatherSetupHeight: 220
             property int weatherDetailHeight: 480
             property int bluetoothEventHeight: 96
@@ -53,7 +59,10 @@ ShellRoot {
             property string transientMode: ""
             property string displayMode: transientMode !== "" ? transientMode : selectedMode
             property bool hoverHold: false
-            property bool expanded: hover.hovered || hoverHold || transientMode !== ""
+            property bool persistentNormal: settingsService.loaded &&
+                settingsService.alwaysShowDateTime &&
+                selectedMode === "normal" && transientMode === ""
+            property bool expanded: persistentNormal || hover.hovered || hoverHold || transientMode !== ""
 
             property var battery: UPower.displayDevice
             property real batteryLevel: battery && battery.ready
@@ -167,7 +176,7 @@ ShellRoot {
             function modeWidth(mode) {
                 if (mode === "music")
                     return 570
-                if (mode === "weatherPanel")
+                if (mode === "weatherPanel" || mode === "settingsPanel")
                     return 560
                 if (mode === "calendarPanel")
                     return 540
@@ -187,6 +196,8 @@ ShellRoot {
                     return weatherKeyState.configured
                         ? weatherDetailHeight
                         : weatherSetupHeight
+                if (mode === "settingsPanel")
+                    return settingsHeight
                 if (mode === "calendarPanel" || mode === "wifiPanel" || mode === "bluetoothPanel" || mode === "soundPanel")
                     return detailHeight
                 if (mode === "bluetooth")
@@ -253,6 +264,12 @@ ShellRoot {
 
             function resetToNormal() {
                 selectedMode = "normal"
+            }
+
+            function openSettings() {
+                transientTimer.stop()
+                transientMode = ""
+                selectedMode = "settingsPanel"
             }
 
             function cycleMode() {
@@ -842,6 +859,35 @@ ShellRoot {
                         if (!bluetoothProbe.running)
                             bluetoothProbe.running = true
                     }
+                }
+
+                NormalSettingsOverlay {
+                    z: 3
+                    active: island.displayMode === "normal" && island.expanded
+                    leftWingWidth: island.actualLeftWing
+                    rightWingWidth: island.actualRightWing
+                    normalHeight: island.normalHeight
+                    now: clock.date
+                    timeText: settingsService.timeText
+                    dateText: settingsService.dateText
+                    showBattery: settingsService.showBattery
+                    battery: island.battery
+                    batteryLevel: island.batteryLevel
+                    batteryCharging: island.batteryCharging
+                    batteryColor: island.batteryColor
+                    batteryShellColor: island.batteryShellColor
+                    onSettingsRequested: island.openSettings()
+                }
+
+                SettingsPanel {
+                    z: 4
+                    anchors.fill: parent
+                    active: island.displayMode === "settingsPanel" && island.expanded
+                    settings: settingsService
+                    weatherConfigured: weatherKeyState.configured
+                    onCloseRequested: island.selectedMode = "normal"
+                    onCalendarRequested: island.selectedMode = "calendarPanel"
+                    onWeatherRequested: island.selectedMode = "weatherPanel"
                 }
             }
 
