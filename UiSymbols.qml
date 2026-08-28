@@ -16,5 +16,4 @@ QtObject {
     readonly property string brightness: "*"
     readonly property string airplane: "[AIR]"
     readonly property string musicPlaceholder: "M"
-    readonly property string audioRoute: "I/O"
 }
