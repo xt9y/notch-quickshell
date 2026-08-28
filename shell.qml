@@ -17,10 +17,9 @@ ShellRoot {
 
         color: "transparent"
 
-        // Keep enough layer-surface space for the double-height music view,
-        // but reserve only the normal notch height so opening Music overlays
-        // the desktop instead of pushing windows downward.
-        implicitHeight: 96
+        // The music page may grow downward, but only the normal notch height is
+        // reserved from Plasma/KWin. The extra music area overlays the desktop.
+        implicitHeight: 112
         exclusionMode: ExclusionMode.Normal
         exclusiveZone: 49
 
@@ -39,7 +38,7 @@ ShellRoot {
             property int notchWidth: 170
             property int collapsedVisualHeight: 44
             property int normalHeight: 48
-            property int musicHeight: 96
+            property int musicHeight: 112
             property int cornerRadius: 13
 
             property string selectedMode: "normal"
@@ -66,7 +65,7 @@ ShellRoot {
             property int lastBatteryState: -1
             property string batteryEventText: "Battery"
 
-            // Only expose the media page while something is actively playing.
+            // Only expose a media page while a player is actively playing.
             property var activePlayer: {
                 var players = Mpris.players.values
                 for (var i = 0; i < players.length; ++i) {
@@ -82,7 +81,9 @@ ShellRoot {
             property string musicArtist: activePlayer
                 ? (activePlayer.trackArtist || activePlayer.trackAlbumArtist || "")
                 : ""
-            property string musicArtUrl: activePlayer ? (activePlayer.trackArtUrl || "") : ""
+            property url musicArtUrl: activePlayer
+                ? normalizeArtUrl(activePlayer.trackArtUrl)
+                : ""
             property real musicPosition: 0
             property real musicLength: activePlayer && activePlayer.lengthSupported
                 ? Math.max(0, activePlayer.length)
@@ -112,11 +113,27 @@ ShellRoot {
 
             property bool expanded: hover.hovered || transientMode !== ""
 
+            function normalizeArtUrl(raw) {
+                if (!raw)
+                    return ""
+
+                var value = raw.toString()
+                if (value === "")
+                    return ""
+
+                // Some players expose an absolute filesystem path instead of a
+                // file:// URL. QML Image needs a URL in that case.
+                if (value.charAt(0) === "/")
+                    return "file://" + value
+
+                return value
+            }
+
             function modeWidth(mode) {
                 if (mode === "music")
                     return 520
                 if (mode === "connectivity")
-                    return 450
+                    return 510
                 if (mode === "volume" || mode === "brightness")
                     return 410
                 if (mode === "battery")
@@ -140,8 +157,6 @@ ShellRoot {
             width: targetWidth
             height: targetHeight
 
-            // If playback stops while Music is open, immediately return to the
-            // clock page. A stopped/paused player is never shown as a Music page.
             onMusicPlayingChanged: {
                 if (!musicPlaying && selectedMode === "music")
                     selectedMode = "normal"
@@ -294,8 +309,6 @@ ShellRoot {
             HoverHandler {
                 id: hover
 
-                // Every fresh hover starts from the date/time page, regardless
-                // of which page was last clicked during the previous hover.
                 onHoveredChanged: {
                     if (!hovered && island.transientMode === "")
                         island.resetToNormal()
@@ -326,8 +339,7 @@ ShellRoot {
                 onTriggered: island.checkBatteryState()
             }
 
-            // MPRIS position is intentionally sampled while a track is playing;
-            // the property itself is not guaranteed to emit updates continuously.
+            // MPRIS position needs sampling while a track is playing.
             Timer {
                 interval: 250
                 repeat: true
@@ -453,13 +465,12 @@ ShellRoot {
                 id: content
                 anchors.fill: parent
 
-                // Tiny music affordance is only visible while audio is actually
-                // playing, never merely because a paused MPRIS player exists.
                 Text {
                     anchors {
                         left: parent.left
                         leftMargin: 19
-                        verticalCenter: parent.verticalCenter
+                        top: parent.top
+                        topMargin: 15
                     }
                     visible: island.musicPlaying && !island.expanded
                     text: "♪"
@@ -552,7 +563,7 @@ ShellRoot {
                             right: parent.right
                             rightMargin: 24
                             top: parent.top
-                            topMargin: (island.normalHeight - implicitHeight) / 2
+                            topMargin: 13
                         }
                         text: Qt.formatDateTime(clock.date, "ddd, d MMM")
                         color: "#b8b8bd"
@@ -561,12 +572,12 @@ ShellRoot {
                     }
                 }
 
-                // ---------- MUSIC / MEDIAMATE STYLE ----------
+                // ---------- MUSIC ----------
                 Item {
                     anchors.fill: parent
                     visible: island.displayMode === "music" && island.musicPlaying && island.expanded
 
-                    // Top row stays aligned with the normal 48px notch.
+                    // Top 48px row.
                     Row {
                         anchors {
                             left: parent.left
@@ -625,68 +636,55 @@ ShellRoot {
                         font.weight: Font.Medium
                     }
 
-                    // Rounded album art. The Canvas clips the source to an exact
-                    // rounded path without adding a Qt graphical-effects dependency.
+                    // Qt's Image loader is used directly so remote MPRIS artwork
+                    // from Spotify, Chromium, Firefox, etc. loads reliably.
                     Item {
                         id: albumArt
                         anchors {
                             left: parent.left
                             leftMargin: 24
-                            bottom: parent.bottom
-                            bottomMargin: 8
+                            top: parent.top
+                            topMargin: 50
                         }
-                        width: 52
-                        height: 52
+                        width: 58
+                        height: 58
 
                         Rectangle {
                             anchors.fill: parent
-                            radius: 10
+                            radius: 11
                             color: "#1c1c1e"
 
                             Text {
                                 anchors.centerIn: parent
+                                visible: artImage.status !== Image.Ready
                                 text: "♪"
                                 color: "#636366"
-                                font.pixelSize: 22
+                                font.pixelSize: 23
                             }
                         }
 
-                        Canvas {
-                            id: albumCanvas
+                        Image {
+                            id: artImage
                             anchors.fill: parent
-                            property string sourceUrl: island.musicArtUrl
+                            anchors.margins: 1
+                            source: island.musicArtUrl
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                            cache: true
+                            smooth: true
+                            mipmap: true
+                            sourceSize.width: 116
+                            sourceSize.height: 116
+                        }
 
-                            onSourceUrlChanged: {
-                                if (sourceUrl !== "")
-                                    loadImage(sourceUrl)
-                                requestPaint()
-                            }
-
-                            onImageLoaded: requestPaint()
-
-                            onPaint: {
-                                var ctx = getContext("2d")
-                                ctx.clearRect(0, 0, width, height)
-                                if (sourceUrl === "" || !isImageLoaded(sourceUrl))
-                                    return
-
-                                var r = 10
-                                ctx.save()
-                                ctx.beginPath()
-                                ctx.moveTo(r, 0)
-                                ctx.lineTo(width - r, 0)
-                                ctx.quadraticCurveTo(width, 0, width, r)
-                                ctx.lineTo(width, height - r)
-                                ctx.quadraticCurveTo(width, height, width - r, height)
-                                ctx.lineTo(r, height)
-                                ctx.quadraticCurveTo(0, height, 0, height - r)
-                                ctx.lineTo(0, r)
-                                ctx.quadraticCurveTo(0, 0, r, 0)
-                                ctx.closePath()
-                                ctx.clip()
-                                ctx.drawImage(sourceUrl, 0, 0, width, height)
-                                ctx.restore()
-                            }
+                        // A rounded frame visually softens the artwork corners
+                        // without depending on an optional graphics-effects module.
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: 11
+                            color: "transparent"
+                            border.width: 2
+                            border.color: "#000000"
                         }
                     }
 
@@ -696,10 +694,10 @@ ShellRoot {
                             leftMargin: 14
                             right: parent.right
                             rightMargin: 24
-                            bottom: parent.bottom
-                            bottomMargin: 8
+                            top: parent.top
+                            topMargin: 51
                         }
-                        height: 52
+                        height: 57
 
                         Text {
                             id: musicTitleText
@@ -893,7 +891,7 @@ ShellRoot {
                             top: parent.top
                             topMargin: 13
                         }
-                        text: island.volumeMuted ? "—" : island.volumePercent + "%"
+                        text: island.volumeMuted ? "—" : island.volumePercent
                         color: "#e8e8ed"
                         font.pixelSize: 17
                         font.weight: Font.Medium
@@ -943,7 +941,7 @@ ShellRoot {
                             top: parent.top
                             topMargin: 13
                         }
-                        text: island.brightnessPercent + "%"
+                        text: island.brightnessPercent
                         color: "#e8e8ed"
                         font.pixelSize: 17
                         font.weight: Font.Medium
@@ -1022,7 +1020,7 @@ ShellRoot {
                 NumberAnimation {
                     duration: 220
                     easing.type: Easing.OutBack
-                    easing.overshoot: 1.10
+                    easing.overshoot: 1.12
                 }
             }
 
