@@ -68,11 +68,39 @@ Item {
             })
         }
 
-        var oldY = wallpaperList.contentY
+        // Assignment changes must never rebuild the ListModel. Recreating all
+        // delegates while a pointer/trackpad gesture is settling can make
+        // ListView recalculate contentY and visibly jump. If the files and
+        // ordering are unchanged, update only the changed properties in place.
+        var sameFiles = wallpaperModel.count === rows.length
+        if (sameFiles) {
+            for (var j = 0; j < rows.length; ++j) {
+                if (wallpaperModel.get(j).filePath !== rows[j].filePath) {
+                    sameFiles = false
+                    break
+                }
+            }
+        }
+
         root.wallpaperFingerprint = fingerprint
+
+        if (sameFiles) {
+            for (var k = 0; k < rows.length; ++k) {
+                var existing = wallpaperModel.get(k)
+                if (existing.fileName !== rows[k].fileName)
+                    wallpaperModel.setProperty(k, "fileName", rows[k].fileName)
+                if (existing.assignment !== rows[k].assignment)
+                    wallpaperModel.setProperty(k, "assignment", rows[k].assignment)
+            }
+            return
+        }
+
+        // A structural rebuild is reserved for actual files being added,
+        // removed or reordered. That path is already deferred while scrolling.
+        var oldY = wallpaperList.contentY
         wallpaperModel.clear()
-        for (var j = 0; j < rows.length; ++j)
-            wallpaperModel.append(rows[j])
+        for (var m = 0; m < rows.length; ++m)
+            wallpaperModel.append(rows[m])
 
         Qt.callLater(function() {
             if (root.listIsMoving())
@@ -136,7 +164,18 @@ Item {
             return
         }
 
+        var path = fields[1]
         var state = fields[2]
+
+        // Update the clicked delegate directly. Do not rescan/rebuild the list
+        // just to reflect its new DAY/NIGHT/NONE state.
+        for (var i = 0; i < wallpaperModel.count; ++i) {
+            if (wallpaperModel.get(i).filePath === path) {
+                wallpaperModel.setProperty(i, "assignment", state)
+                break
+            }
+        }
+
         if (state === "day")
             root.statusText = "Day wallpaper · 07:00–19:00"
         else if (state === "night")
@@ -463,7 +502,10 @@ Item {
         }
         onRunningChanged: if (!running) {
             root.cycleInFlightPath = ""
-            Qt.callLater(root.refresh)
+
+            // The clicked row was already changed in place by
+            // consumeAssignmentResult(). Running a scan here used to rebuild
+            // the model and caused the post-click scrolling teleport.
             Qt.callLater(root.runSchedule)
 
             if (root.queuedCyclePath !== "") {
