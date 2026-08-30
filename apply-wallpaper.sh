@@ -2,12 +2,6 @@
 
 set -u
 
-ROOT_MODE=0
-if [[ "${1:-}" == "--root" ]]; then
-    ROOT_MODE=1
-    shift
-fi
-
 WALLPAPER="${1:-}"
 if [[ -z "$WALLPAPER" || ! -f "$WALLPAPER" ]]; then
     printf 'ERROR\tWallpaper does not exist\n'
@@ -15,48 +9,23 @@ if [[ -z "$WALLPAPER" || ! -f "$WALLPAPER" ]]; then
 fi
 
 WALLPAPER="$(readlink -f -- "$WALLPAPER")"
-NAME="$(basename -- "$WALLPAPER")"
-DEST="/var/lib/plasmalogin/wallpapers/login-wallpaper${NAME}"
+EXT="${WALLPAPER##*.}"
+EXT="${EXT,,}"
 
-apply_root_parts() {
-    local rc=0
-
-    mkdir -p /var/lib/plasmalogin/wallpapers || rc=1
-    cp -- "$WALLPAPER" "$DEST" || rc=1
-
-    if [[ -f /etc/plasmalogin.conf ]]; then
-        sed -i "s|Image=.*|Image=file://${DEST}|" /etc/plasmalogin.conf || rc=1
-    else
-        rc=1
-    fi
-
-    mkdir -p /usr/local/share/wallpapers || rc=1
-    cp -- "$WALLPAPER" /usr/local/share/wallpapers/login-wallpaper.jpg || rc=1
-
-    return "$rc"
-}
-
-if (( ROOT_MODE )); then
-    apply_root_parts
-    exit $?
+if [[ "$EXT" != "jpg" && "$EXT" != "png" ]]; then
+    printf 'ERROR\tOnly .jpg and .png are supported\n'
+    exit 2
 fi
 
 root_rc=1
 ROOT_HELPER="/usr/local/libexec/notch-wallpaper-root"
 
+# Deliberately never invoke pkexec or interactive sudo from the picker.
+# setup-no-password.sh installs a narrowly scoped NOPASSWD helper once.
 if (( EUID == 0 )); then
-    apply_root_parts && root_rc=0
+    root_rc=0
 elif [[ -x "$ROOT_HELPER" ]] && command -v sudo >/dev/null 2>&1; then
     sudo -n "$ROOT_HELPER" "$WALLPAPER" >/dev/null 2>&1 && root_rc=0
-fi
-
-# Backward-compatible fallback before setup-no-password.sh has been run.
-if (( root_rc != 0 )); then
-    if command -v pkexec >/dev/null 2>&1; then
-        pkexec bash "$0" --root "$WALLPAPER" && root_rc=0
-    elif command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
-        sudo -n bash "$0" --root "$WALLPAPER" && root_rc=0
-    fi
 fi
 
 lock_rc=0
