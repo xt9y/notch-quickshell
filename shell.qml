@@ -49,6 +49,7 @@ ShellRoot {
             property int normalHeight: 48
             property int musicHeight: 132
             property int detailHeight: 360
+            property int systemDetailHeight: 480
             property int settingsHeight: 460
             property int wallpaperHeight: 480
             property int weatherSetupHeight: 220
@@ -179,6 +180,8 @@ ShellRoot {
                     return 570
                 if (mode === "wallpaperPanel")
                     return 620
+                if (mode === "systemPanel")
+                    return 700
                 if (mode === "weatherPanel" || mode === "settingsPanel")
                     return 560
                 if (mode === "calendarPanel")
@@ -197,6 +200,8 @@ ShellRoot {
                     return musicHeight
                 if (mode === "wallpaperPanel")
                     return wallpaperHeight
+                if (mode === "systemPanel")
+                    return systemDetailHeight
                 if (mode === "weatherPanel")
                     return weatherKeyState.configured
                         ? weatherDetailHeight
@@ -299,7 +304,11 @@ ShellRoot {
                 else if (selectedMode === "connectivity")
                     selectedMode = "soundPanel"
                 else if (selectedMode === "soundPanel")
+                    selectedMode = "system"
+                else if (selectedMode === "system")
                     selectedMode = "normal"
+                else if (selectedMode === "systemPanel")
+                    selectedMode = "system"
                 else
                     selectedMode = "normal"
             }
@@ -886,6 +895,30 @@ ShellRoot {
                         if (!bluetoothProbe.running)
                             bluetoothProbe.running = true
                     }
+                }
+
+                SystemMonitor {
+                    id: systemMonitor
+                    active: island.expanded &&
+                        (island.displayMode === "system" || island.displayMode === "systemPanel")
+                }
+
+                SystemPanel {
+                    z: 2
+                    anchors.fill: parent
+                    active: island.expanded &&
+                        (island.displayMode === "system" || island.displayMode === "systemPanel")
+                    detailMode: island.displayMode === "systemPanel"
+                    leftWingWidth: island.actualLeftWing
+                    rightWingWidth: island.actualRightWing
+                    normalHeight: island.normalHeight
+                    monitor: systemMonitor
+                    onDetailRequested: {
+                        transientTimer.stop()
+                        island.transientMode = ""
+                        island.selectedMode = "systemPanel"
+                    }
+                    onBackRequested: island.selectedMode = "system"
                 }
 
                 NormalSettingsOverlay {
