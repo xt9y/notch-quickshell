@@ -8,10 +8,18 @@ if (( EUID != 0 )); then
 fi
 
 CALLER="${SUDO_USER:-}"
-WALLPAPER="${1:-}"
+if [[ -z "$CALLER" || "$CALLER" == "root" ]]; then
+    echo "missing unprivileged caller" >&2
+    exit 2
+fi
 
-if [[ -z "$CALLER" || -z "$WALLPAPER" ]]; then
-    echo "missing caller or wallpaper" >&2
+if [[ "${1:-}" == "--probe" ]]; then
+    exit 0
+fi
+
+WALLPAPER="${1:-}"
+if [[ -z "$WALLPAPER" ]]; then
+    echo "missing wallpaper" >&2
     exit 2
 fi
 
@@ -39,8 +47,6 @@ fi
 TMP="$(mktemp /tmp/notch-wallpaper.XXXXXX)"
 trap 'rm -f -- "$TMP"' EXIT
 
-# Read the user-controlled source as the unprivileged caller. This prevents
-# a symlink race from turning the helper into an arbitrary root file reader.
 if command -v runuser >/dev/null 2>&1; then
     runuser -u "$CALLER" -- cat -- "$WALLPAPER" > "$TMP"
 else
