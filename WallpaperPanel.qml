@@ -9,6 +9,7 @@ Item {
     property bool active: false
     property string selectedPath: ""
     property string statusText: ""
+    property string wallpaperFingerprint: ""
     property bool applying: applyAction.running
 
     signal closeRequested()
@@ -35,6 +36,12 @@ Item {
     }
 
     function consumeWallpapers(raw) {
+        var fingerprint = raw.trim()
+        if (fingerprint === root.wallpaperFingerprint)
+            return
+
+        root.wallpaperFingerprint = fingerprint
+
         var rows = []
         var lines = raw.split("\n")
 
@@ -52,9 +59,15 @@ Item {
             })
         }
 
+        var oldY = wallpaperList.contentY
         wallpaperModel.clear()
         for (var j = 0; j < rows.length; ++j)
             wallpaperModel.append(rows[j])
+
+        Qt.callLater(function() {
+            var maxY = Math.max(0, wallpaperList.contentHeight - wallpaperList.height)
+            wallpaperList.contentY = Math.max(0, Math.min(oldY, maxY))
+        })
     }
 
     function refresh() {
@@ -90,7 +103,7 @@ Item {
         } else if (fields[0] === "PARTIAL") {
             if (fields.length > 1)
                 root.selectedPath = fields.slice(1).join("\t")
-            root.statusText = "Desktop applied; login or lock screen needs permission"
+            root.statusText = "Desktop applied; run setup-no-password.sh once"
         } else {
             root.statusText = fields.length > 1
                 ? fields.slice(1).join(" ")
@@ -182,7 +195,10 @@ Item {
         spacing: 7
         model: wallpaperModel
         boundsBehavior: Flickable.StopAtBounds
+        flickDeceleration: 2800
+        maximumFlickVelocity: 5500
         interactive: contentHeight > height
+        cacheBuffer: height
 
         delegate: Item {
             id: row
@@ -248,14 +264,16 @@ Item {
                 color: row.selected ? "#30d158" : "#48484a"
             }
 
-            MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
+            TapHandler {
+                acceptedButtons: Qt.LeftButton
                 enabled: !root.applying
-                onClicked: root.applyWallpaper(row.wallpaperPath)
+                onTapped: root.applyWallpaper(row.wallpaperPath)
             }
 
-            HoverHandler { id: rowHover }
+            HoverHandler {
+                id: rowHover
+                cursorShape: Qt.PointingHandCursor
+            }
         }
     }
 
