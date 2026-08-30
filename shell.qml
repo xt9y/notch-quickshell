@@ -50,6 +50,7 @@ ShellRoot {
             property int musicHeight: 132
             property int detailHeight: 360
             property int settingsHeight: 460
+            property int wallpaperHeight: 480
             property int weatherSetupHeight: 220
             property int weatherDetailHeight: 480
             property int bluetoothEventHeight: 96
@@ -176,6 +177,8 @@ ShellRoot {
             function modeWidth(mode) {
                 if (mode === "music")
                     return 570
+                if (mode === "wallpaperPanel")
+                    return 620
                 if (mode === "weatherPanel" || mode === "settingsPanel")
                     return 560
                 if (mode === "calendarPanel")
@@ -192,6 +195,8 @@ ShellRoot {
             function modeHeight(mode) {
                 if (mode === "music")
                     return musicHeight
+                if (mode === "wallpaperPanel")
+                    return wallpaperHeight
                 if (mode === "weatherPanel")
                     return weatherKeyState.configured
                         ? weatherDetailHeight
@@ -274,6 +279,14 @@ ShellRoot {
                 transientTimer.stop()
                 transientMode = ""
                 selectedMode = "settingsPanel"
+            }
+
+            function openWallpapers() {
+                transientTimer.stop()
+                transientMode = ""
+                selectedMode = selectedMode === "wallpaperPanel"
+                    ? "normal"
+                    : "wallpaperPanel"
             }
 
             function cycleMode() {
@@ -572,7 +585,17 @@ ShellRoot {
                 y: 0
                 width: island.notchWidth * island.unit
                 height: island.normalHeight * island.unit
-                onClicked: island.cycleMode()
+                acceptedButtons: Qt.LeftButton
+                onClicked: function(mouse) {
+                    var modifierMask = Qt.ShiftModifier |
+                        Qt.ControlModifier |
+                        Qt.AltModifier |
+                        Qt.MetaModifier
+                    if ((mouse.modifiers & modifierMask) !== 0)
+                        island.openWallpapers()
+                    else
+                        island.cycleMode()
+                }
             }
 
             Timer {
@@ -897,6 +920,13 @@ ShellRoot {
                     onCloseRequested: island.selectedMode = "normal"
                     onCalendarRequested: island.selectedMode = "calendarPanel"
                     onWeatherRequested: island.selectedMode = "weatherPanel"
+                }
+
+                WallpaperPanel {
+                    z: 5
+                    anchors.fill: parent
+                    active: island.displayMode === "wallpaperPanel" && island.expanded
+                    onCloseRequested: island.selectedMode = "normal"
                 }
             }
 
