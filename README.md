@@ -7,7 +7,31 @@ Features:
 - Connectivity panel
 - Music player (MPRIS)
 - Battery status via UPower
+- Native btop-style system monitor with RAM/ZRAM overview
 - Wallpaper integration
+
+## System monitor
+
+The normal click cycle now continues from Sound into a compact System view:
+
+```text
+... -> Sound -> System -> Normal
+```
+
+The compact System view shows live RAM and ZRAM fill levels. Click either RAM or ZRAM to expand the notch into the full system monitor.
+
+The expanded monitor is a cleaned-up native Quickshell interpretation of btop and shows:
+
+- CPU usage, core count and load
+- RAM usage
+- ZRAM usage
+- Root filesystem usage
+- Live CPU/RAM/ZRAM history graph
+- Hostname and uptime
+- 1/5/15-minute load averages
+- Top processes with PID, CPU and memory usage
+
+The monitor reads Linux system data from `/proc`, `/proc/swaps`, `df`, and `ps`. It only polls while the compact or expanded System mode is visible.
 
 ## Wallpaper picker
 
