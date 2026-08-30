@@ -47,10 +47,11 @@ else
     sudo -u "$CALLER" -- cat -- "$WALLPAPER" > "$TMP"
 fi
 
-NAME="$(basename -- "$WALLPAPER")"
-DEST="/var/lib/plasmalogin/wallpapers/login-wallpaper${NAME}"
+DEST="/var/lib/plasmalogin/wallpapers/login-wallpaper.${EXT}"
 
 mkdir -p /var/lib/plasmalogin/wallpapers
+rm -f /var/lib/plasmalogin/wallpapers/login-wallpaper.jpg \
+      /var/lib/plasmalogin/wallpapers/login-wallpaper.png
 cp -- "$TMP" "$DEST"
 chmod 0644 "$DEST"
 
