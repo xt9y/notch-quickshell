@@ -10,6 +10,8 @@ Item {
     property string selectedPath: ""
     property string statusText: ""
     property string wallpaperFingerprint: ""
+    property string pendingWallpaperRaw: ""
+    property bool pendingWallpaperRefresh: false
     property bool applying: applyAction.running
 
     signal closeRequested()
@@ -35,16 +37,17 @@ Item {
         }
     }
 
-    function consumeWallpapers(raw) {
+    function listIsMoving() {
+        return wallpaperList.dragging || wallpaperList.flicking || wallpaperList.moving
+    }
+
+    function applyWallpaperModel(raw) {
         var fingerprint = raw.trim()
         if (fingerprint === root.wallpaperFingerprint)
             return
 
-        root.wallpaperFingerprint = fingerprint
-
         var rows = []
         var lines = raw.split("\n")
-
         for (var i = 0; i < lines.length; ++i) {
             if (lines[i] === "")
                 continue
@@ -60,18 +63,48 @@ Item {
         }
 
         var oldY = wallpaperList.contentY
+        root.wallpaperFingerprint = fingerprint
         wallpaperModel.clear()
         for (var j = 0; j < rows.length; ++j)
             wallpaperModel.append(rows[j])
 
         Qt.callLater(function() {
-            var maxY = Math.max(0, wallpaperList.contentHeight - wallpaperList.height)
-            wallpaperList.contentY = Math.max(0, Math.min(oldY, maxY))
+            if (root.listIsMoving())
+                return
+            var minY = wallpaperList.originY
+            var maxY = Math.max(
+                minY,
+                wallpaperList.originY + wallpaperList.contentHeight - wallpaperList.height
+            )
+            wallpaperList.contentY = Math.max(minY, Math.min(oldY, maxY))
         })
     }
 
+    function consumeWallpapers(raw) {
+        if (raw.trim() === root.wallpaperFingerprint)
+            return
+
+        if (root.listIsMoving()) {
+            root.pendingWallpaperRaw = raw
+            root.pendingWallpaperRefresh = true
+            return
+        }
+
+        root.applyWallpaperModel(raw)
+    }
+
+    function flushPendingWallpapers() {
+        if (!root.pendingWallpaperRefresh || root.listIsMoving())
+            return
+
+        var raw = root.pendingWallpaperRaw
+        root.pendingWallpaperRaw = ""
+        root.pendingWallpaperRefresh = false
+        root.applyWallpaperModel(raw)
+    }
+
     function refresh() {
-        if (root.active && !scanAction.running)
+        if (root.active && !root.listIsMoving() && !scanAction.running)
             scanAction.running = true
     }
 
@@ -103,13 +136,15 @@ Item {
         } else if (fields[0] === "PARTIAL") {
             if (fields.length > 1)
                 root.selectedPath = fields.slice(1).join("\t")
-            root.statusText = "Desktop applied; run setup-no-password.sh once"
+            root.statusText = "Desktop applied; privileged helper not ready"
         } else {
             root.statusText = fields.length > 1
                 ? fields.slice(1).join(" ")
                 : "Could not apply wallpaper"
         }
     }
+
+    Component.onCompleted: startupSetup.running = true
 
     onActiveChanged: if (active)
         Qt.callLater(root.refresh)
@@ -195,10 +230,12 @@ Item {
         spacing: 7
         model: wallpaperModel
         boundsBehavior: Flickable.StopAtBounds
-        flickDeceleration: 2800
-        maximumFlickVelocity: 5500
+        flickDeceleration: 3200
+        maximumFlickVelocity: 4200
         interactive: contentHeight > height
-        cacheBuffer: height
+        cacheBuffer: height * 2
+
+        onMovementEnded: Qt.callLater(root.flushPendingWallpapers)
 
         delegate: Item {
             id: row
@@ -267,6 +304,7 @@ Item {
             TapHandler {
                 acceptedButtons: Qt.LeftButton
                 enabled: !root.applying
+                gesturePolicy: TapHandler.DragThreshold
                 onTapped: root.applyWallpaper(row.wallpaperPath)
             }
 
@@ -333,11 +371,14 @@ Item {
     }
 
     Timer {
-        interval: 1400
+        interval: 2200
         repeat: true
         running: root.active
         triggeredOnStart: true
-        onTriggered: root.refresh()
+        onTriggered: {
+            if (!root.listIsMoving())
+                root.refresh()
+        }
     }
 
     Process {
@@ -362,5 +403,21 @@ Item {
         }
         onRunningChanged: if (!running)
             Qt.callLater(root.refresh)
+    }
+
+    Process {
+        id: startupSetup
+        command: [
+            "bash",
+            "-lc",
+            "helper=/usr/local/libexec/notch-wallpaper-root; " +
+            "if sudo -n \"$helper\" --probe >/dev/null 2>&1; then exit 0; fi; " +
+            "setup=\"${HOME}/.config/quickshell/notch/setup-no-password.sh\"; " +
+            "[ -r \"$setup\" ] || exit 0; user=$(id -un); " +
+            "if command -v pkexec >/dev/null 2>&1; then " +
+            "pkexec bash \"$setup\" --install-for \"$user\" >/dev/null 2>&1 || true; " +
+            "elif sudo -n true >/dev/null 2>&1; then " +
+            "sudo bash \"$setup\" --install-for \"$user\" >/dev/null 2>&1 || true; fi"
+        ]
     }
 }
