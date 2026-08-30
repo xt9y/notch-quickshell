@@ -10,6 +10,12 @@ Item {
     property int normalHeight: 48
     property var monitor: null
 
+    // Keep the compact System content away from the physical display notch.
+    // The outer black panel can be wider without stretching RAM/ZRAM content
+    // back toward the center. 594px panel - 250px center gap = 172px per side.
+    property int compactCenterGap: 250
+    property real compactWingWidth: 172
+
     signal detailRequested()
     signal backRequested()
 
@@ -186,7 +192,7 @@ Item {
         CompactMeter {
             anchors.left: parent.left
             anchors.top: parent.top
-            width: root.leftWingWidth
+            width: root.compactWingWidth
             label: "RAM"
             percent: root.monitor ? root.monitor.ramPercent : 0
             valueText: root.monitor
@@ -199,7 +205,7 @@ Item {
         CompactMeter {
             anchors.right: parent.right
             anchors.top: parent.top
-            width: root.rightWingWidth
+            width: root.compactWingWidth
             label: "ZRAM"
             percent: root.monitor ? root.monitor.zramPercent : 0
             valueText: root.monitor
