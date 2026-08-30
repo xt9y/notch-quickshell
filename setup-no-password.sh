@@ -3,14 +3,23 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+TARGET_USER=""
 
-if (( EUID != 0 )); then
-    exec sudo bash "$0" "$@"
+if [[ "${1:-}" == "--install-for" ]]; then
+    TARGET_USER="${2:-}"
 fi
 
-TARGET_USER="${SUDO_USER:-}"
+if (( EUID != 0 )); then
+    TARGET_USER="${TARGET_USER:-${USER:-$(id -un)}}"
+    exec sudo bash "$0" --install-for "$TARGET_USER"
+fi
+
+if [[ -z "$TARGET_USER" ]]; then
+    TARGET_USER="${SUDO_USER:-}"
+fi
+
 if [[ -z "$TARGET_USER" || "$TARGET_USER" == "root" ]]; then
-    echo "Run this script from your normal desktop user with sudo." >&2
+    echo "Could not determine desktop user." >&2
     exit 1
 fi
 
@@ -27,7 +36,7 @@ install -o root -g root -m 0755 \
 SAFE_USER="${TARGET_USER//[^A-Za-z0-9_.-]/_}"
 SUDOERS_FILE="/etc/sudoers.d/notch-wallpaper-${SAFE_USER}"
 
-printf '%s ALL=(root) NOPASSWD: /usr/local/libexec/notch-wallpaper-root\n' \
+printf '%s ALL=(root) NOPASSWD: /usr/local/libexec/notch-wallpaper-root *\n' \
     "$TARGET_USER" > "$SUDOERS_FILE"
 chmod 0440 "$SUDOERS_FILE"
 
@@ -38,4 +47,3 @@ if ! visudo -cf "$SUDOERS_FILE" >/dev/null; then
 fi
 
 echo "Installed passwordless notch wallpaper helper for $TARGET_USER."
-echo "Future wallpaper selections will not show a sudo/polkit password prompt."
