@@ -22,19 +22,16 @@ ROOT_HELPER="/usr/local/libexec/notch-wallpaper-root"
 
 # Deliberately never invoke pkexec or interactive sudo from the picker.
 # setup-no-password.sh installs a narrowly scoped NOPASSWD helper once.
-if (( EUID == 0 )); then
-    root_rc=0
-elif [[ -x "$ROOT_HELPER" ]] && command -v sudo >/dev/null 2>&1; then
+if [[ -x "$ROOT_HELPER" ]] && command -v sudo >/dev/null 2>&1; then
     sudo -n "$ROOT_HELPER" "$WALLPAPER" >/dev/null 2>&1 && root_rc=0
 fi
 
-lock_rc=0
+lock_rc=1
 LOCK_CONFIG="${HOME}/.config/kscreenlockerrc"
-if [[ -f "$LOCK_CONFIG" ]]; then
+if (( root_rc == 0 )) && [[ -f "$LOCK_CONFIG" ]]; then
+    lock_rc=0
     sed -i 's|Image=file://.*|Image=file:///usr/local/share/wallpapers/login-wallpaper.jpg|' "$LOCK_CONFIG" || lock_rc=1
     sed -i 's|PreviewImage=file://.*|PreviewImage=file:///usr/local/share/wallpapers/login-wallpaper.jpg|' "$LOCK_CONFIG" || lock_rc=1
-else
-    lock_rc=1
 fi
 
 desktop_rc=0
