@@ -182,6 +182,8 @@ ShellRoot {
                     return 620
                 if (mode === "systemPanel")
                     return 700
+                if (mode === "system")
+                    return 594
                 if (mode === "weatherPanel" || mode === "settingsPanel")
                     return 560
                 if (mode === "calendarPanel")
