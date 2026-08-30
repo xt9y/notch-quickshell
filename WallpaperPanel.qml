@@ -8,11 +8,16 @@ Item {
 
     property bool active: false
     property string selectedPath: ""
+    property string currentPhase: ""
     property string statusText: ""
     property string wallpaperFingerprint: ""
     property string pendingWallpaperRaw: ""
     property bool pendingWallpaperRefresh: false
-    property bool applying: applyAction.running
+    property string cycleInFlightPath: ""
+    property string queuedCyclePath: ""
+    property bool applying: scheduleAction.running
+    property string schedulerPath:
+        (Quickshell.env("HOME") || "") + "/.config/quickshell/notch/wallpaper-schedule.sh"
 
     signal closeRequested()
 
@@ -52,13 +57,14 @@ Item {
             if (lines[i] === "")
                 continue
 
-            var split = lines[i].indexOf("\t")
-            if (split <= 0)
+            var parts = lines[i].split("\t")
+            if (parts.length < 3)
                 continue
 
             rows.push({
-                fileName: lines[i].slice(0, split),
-                filePath: lines[i].slice(split + 1)
+                fileName: parts[0],
+                filePath: parts[1],
+                assignment: parts[2]
             })
         }
 
@@ -108,43 +114,67 @@ Item {
             scanAction.running = true
     }
 
-    function applyWallpaper(path) {
-        if (path === "" || applyAction.running)
+    function cycleAssignment(path) {
+        if (path === "")
             return
 
-        root.statusText = "Applying..."
-        applyAction.command = [
-            "bash",
-            (Quickshell.env("HOME") || "") + "/.config/quickshell/notch/apply-wallpaper.sh",
-            path
-        ]
-        applyAction.running = true
-    }
-
-    function consumeApplyResult(raw) {
-        var line = raw.trim()
-        if (line === "") {
-            root.statusText = "Could not apply wallpaper"
+        if (assignmentAction.running) {
+            root.queuedCyclePath = path
             return
         }
 
-        var fields = line.split("\t")
-        if (fields[0] === "OK") {
-            if (fields.length > 1)
-                root.selectedPath = fields.slice(1).join("\t")
-            root.statusText = "Applied to desktop, lock screen and login"
-        } else if (fields[0] === "PARTIAL") {
-            if (fields.length > 1)
-                root.selectedPath = fields.slice(1).join("\t")
-            root.statusText = "Desktop applied; privileged helper not ready"
-        } else {
-            root.statusText = fields.length > 1
-                ? fields.slice(1).join(" ")
-                : "Could not apply wallpaper"
+        root.cycleInFlightPath = path
+        assignmentAction.command = ["bash", root.schedulerPath, "cycle", path]
+        assignmentAction.running = true
+    }
+
+    function consumeAssignmentResult(raw) {
+        var fields = raw.trim().split("\t")
+        if (fields.length < 3 || fields[0] !== "STATE") {
+            root.statusText = "Could not change wallpaper schedule"
+            statusClearTimer.restart()
+            return
+        }
+
+        var state = fields[2]
+        if (state === "day")
+            root.statusText = "Day wallpaper · 07:00–19:00"
+        else if (state === "night")
+            root.statusText = "Night wallpaper · 19:00–07:00"
+        else
+            root.statusText = "Wallpaper removed from schedule"
+
+        statusClearTimer.restart()
+    }
+
+    function runSchedule() {
+        if (scheduleAction.running)
+            return
+        scheduleAction.running = true
+    }
+
+    function consumeScheduleResult(raw) {
+        var fields = raw.trim().split("\t")
+        if (fields.length === 0)
+            return
+
+        if (fields[0] === "ACTIVE" && fields.length >= 3) {
+            root.selectedPath = fields[1]
+            root.currentPhase = fields[2]
+            if (fields.length >= 4 && fields[3] === "PARTIAL" && root.active) {
+                root.statusText = "Desktop changed; login helper is not ready yet"
+                statusClearTimer.restart()
+            }
+        } else if (fields[0] === "NONE" && fields.length >= 2) {
+            root.selectedPath = ""
+            root.currentPhase = fields[1]
         }
     }
 
-    Component.onCompleted: startupSetup.running = true
+    Component.onCompleted: {
+        startupSetup.running = true
+        Qt.callLater(root.runSchedule)
+    }
 
     onActiveChanged: if (active)
         Qt.callLater(root.refresh)
@@ -242,7 +272,11 @@ Item {
 
             property string wallpaperName: model.fileName
             property string wallpaperPath: model.filePath
-            property bool selected: root.selectedPath === wallpaperPath
+            property string assignment: model.assignment || "none"
+            property bool scheduledActive: root.selectedPath === wallpaperPath
+            property color assignmentColor: assignment === "day"
+                ? "#ff9f0a"
+                : assignment === "night" ? "#0a84ff" : "#3a3a3c"
 
             width: ListView.view ? ListView.view.width : 0
             height: 94
@@ -251,9 +285,10 @@ Item {
                 anchors.fill: parent
                 radius: 12
                 color: rowHover.hovered ? "#161618" : "#0c0c0e"
-                border.width: row.selected ? 1 : 0
-                border.color: "#5e5ce6"
+                border.width: row.assignment === "none" ? 0 : 2
+                border.color: row.assignmentColor
                 Behavior on color { ColorAnimation { duration: 100 } }
+                Behavior on border.color { ColorAnimation { duration: 120 } }
             }
 
             Rectangle {
@@ -280,32 +315,48 @@ Item {
             Text {
                 anchors.left: previewFrame.right
                 anchors.leftMargin: 14
-                anchors.right: stateDot.left
+                anchors.right: activeDot.left
                 anchors.rightMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
                 text: row.wallpaperName
                 color: "#e8e8ed"
                 font.pixelSize: 13
-                font.weight: row.selected ? Font.DemiBold : Font.Medium
+                font.weight: row.assignment !== "none" ? Font.DemiBold : Font.Medium
                 elide: Text.ElideMiddle
             }
 
             Rectangle {
-                id: stateDot
-                anchors.right: parent.right
-                anchors.rightMargin: 15
+                id: activeDot
+                anchors.right: assignmentLabel.left
+                anchors.rightMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
                 width: 8
                 height: 8
                 radius: 4
-                color: row.selected ? "#30d158" : "#48484a"
+                color: row.scheduledActive ? "#30d158" : "transparent"
+                border.width: row.scheduledActive ? 0 : 1
+                border.color: "#3a3a3c"
+            }
+
+            Text {
+                id: assignmentLabel
+                anchors.right: parent.right
+                anchors.rightMargin: 15
+                anchors.verticalCenter: parent.verticalCenter
+                width: 46
+                text: row.assignment === "day"
+                    ? "DAY"
+                    : row.assignment === "night" ? "NIGHT" : "NONE"
+                color: row.assignment === "none" ? "#636366" : row.assignmentColor
+                font.pixelSize: 10
+                font.weight: Font.DemiBold
+                horizontalAlignment: Text.AlignRight
             }
 
             TapHandler {
                 acceptedButtons: Qt.LeftButton
-                enabled: !root.applying
                 gesturePolicy: TapHandler.DragThreshold
-                onTapped: root.applyWallpaper(row.wallpaperPath)
+                onTapped: root.cycleAssignment(row.wallpaperPath)
             }
 
             HoverHandler {
@@ -361,13 +412,21 @@ Item {
             anchors.verticalCenterOffset: 2
             text: root.statusText !== ""
                 ? root.statusText
-                : wallpaperModel.count + " wallpaper" + (wallpaperModel.count === 1 ? "" : "s")
+                : "Click: NONE → DAY → NIGHT · current: " +
+                    (root.currentPhase === "night" ? "NIGHT" : "DAY")
             color: root.applying ? "#d1d1d6" : "#8e8e93"
             font.pixelSize: 11
             font.weight: Font.Medium
             horizontalAlignment: Text.AlignHCenter
             elide: Text.ElideRight
         }
+    }
+
+    Timer {
+        id: statusClearTimer
+        interval: 2400
+        repeat: false
+        onTriggered: root.statusText = ""
     }
 
     Timer {
@@ -381,28 +440,46 @@ Item {
         }
     }
 
+    Timer {
+        interval: 60000
+        repeat: true
+        running: true
+        triggeredOnStart: true
+        onTriggered: root.runSchedule()
+    }
+
     Process {
         id: scanAction
-        command: [
-            "bash",
-            "-lc",
-            "dir=\"${HOME}/.config/quickshell/notch/wallpaper\"; " +
-            "mkdir -p \"$dir\"; " +
-            "find \"$dir\" -maxdepth 1 -type f \\( -iname '*.jpg' -o -iname '*.png' \\) " +
-            "-printf '%f\\t%p\\n' 2>/dev/null | sort -f"
-        ]
+        command: ["bash", root.schedulerPath, "list"]
         stdout: StdioCollector {
             onStreamFinished: root.consumeWallpapers(text)
         }
     }
 
     Process {
-        id: applyAction
+        id: assignmentAction
         stdout: StdioCollector {
-            onStreamFinished: root.consumeApplyResult(text)
+            onStreamFinished: root.consumeAssignmentResult(text)
         }
-        onRunningChanged: if (!running)
+        onRunningChanged: if (!running) {
+            root.cycleInFlightPath = ""
             Qt.callLater(root.refresh)
+            Qt.callLater(root.runSchedule)
+
+            if (root.queuedCyclePath !== "") {
+                var queued = root.queuedCyclePath
+                root.queuedCyclePath = ""
+                Qt.callLater(function() { root.cycleAssignment(queued) })
+            }
+        }
+    }
+
+    Process {
+        id: scheduleAction
+        command: ["bash", root.schedulerPath, "apply-current"]
+        stdout: StdioCollector {
+            onStreamFinished: root.consumeScheduleResult(text)
+        }
     }
 
     Process {
@@ -419,5 +496,7 @@ Item {
             "elif sudo -n true >/dev/null 2>&1; then " +
             "sudo bash \"$setup\" --install-for \"$user\" >/dev/null 2>&1 || true; fi"
         ]
+        onRunningChanged: if (!running)
+            Qt.callLater(root.runSchedule)
     }
 }
