@@ -42,12 +42,21 @@ if (( ROOT_MODE )); then
 fi
 
 root_rc=1
+ROOT_HELPER="/usr/local/libexec/notch-wallpaper-root"
+
 if (( EUID == 0 )); then
     apply_root_parts && root_rc=0
-elif command -v pkexec >/dev/null 2>&1; then
-    pkexec bash "$0" --root "$WALLPAPER" && root_rc=0
-elif command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
-    sudo -n bash "$0" --root "$WALLPAPER" && root_rc=0
+elif [[ -x "$ROOT_HELPER" ]] && command -v sudo >/dev/null 2>&1; then
+    sudo -n "$ROOT_HELPER" "$WALLPAPER" >/dev/null 2>&1 && root_rc=0
+fi
+
+# Backward-compatible fallback before setup-no-password.sh has been run.
+if (( root_rc != 0 )); then
+    if command -v pkexec >/dev/null 2>&1; then
+        pkexec bash "$0" --root "$WALLPAPER" && root_rc=0
+    elif command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
+        sudo -n bash "$0" --root "$WALLPAPER" && root_rc=0
+    fi
 fi
 
 lock_rc=0
