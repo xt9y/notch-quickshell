@@ -185,6 +185,17 @@ Item {
             }
         }
 
+        ToggleRow {
+            width: parent.width
+            label: "Show in fullscreen apps"
+            detail: "Keep the notch above fullscreen windows"
+            checked: root.settings ? root.settings.showInFullscreen : true
+            onToggled: function(value) {
+                if (root.settings)
+                    root.settings.setShowInFullscreen(value)
+            }
+        }
+
         Rectangle {
             width: parent.width
             height: 42
