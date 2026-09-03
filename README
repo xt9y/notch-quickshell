@@ -1,0 +1,7 @@
+notch-quickshell
+
+macOS-style Quickshell notch for KDE/Wayland.
+
+run        --> qs -c notch
+wallpapers --> ~/.config/quickshell/notch/wallpaper
+setup      --> sudo bash setup-no-password.sh (optional)
