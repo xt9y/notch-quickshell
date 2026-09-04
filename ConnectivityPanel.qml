@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQml.Models
 import Quickshell.Io
 
@@ -122,11 +123,9 @@ Item {
     ListModel { id: bluetoothModel }
 
     function wifiScript(rescan) {
-        var scan = rescan
-            ? "nmcli device wifi rescan >/dev/null 2>&1 || true; "
-            : ""
+        var scanMode = rescan ? "yes" : "no"
 
-        return "command -v nmcli >/dev/null 2>&1 || exit 0; " + scan +
+        return "command -v nmcli >/dev/null 2>&1 || exit 0; " +
             "state=$(nmcli -t -f WIFI general 2>/dev/null | head -n1); " +
             "printf 'W\\t%s\\n' \"$state\"; " +
             "dev=$(nmcli -t -f DEVICE,TYPE,STATE device status 2>/dev/null | awk -F: '$2 == \"wifi\" && $3 == \"connected\" {print $1; exit}'); " +
@@ -140,7 +139,7 @@ Item {
             "ssid=$(nmcli -g 802-11-wireless.ssid connection show uuid \"$uuid\" 2>/dev/null | head -n1); " +
             "[ -n \"$ssid\" ] && printf 'K\\t%s\\t%s\\n' \"$ssid\" \"$uuid\"; " +
             "done < <(nmcli -t -f UUID,TYPE connection show 2>/dev/null); " +
-            "nmcli -m multiline -f IN-USE,SSID,SIGNAL,SECURITY device wifi list --rescan no 2>/dev/null | " +
+            "nmcli -m multiline -f IN-USE,SSID,SIGNAL,SECURITY device wifi list --rescan " + scanMode + " 2>/dev/null | " +
             "awk 'BEGIN { OFS=\"\\t\"; inuse=\"\"; ssid=\"\"; signal=0; security=\"\" } " +
             "/^IN-USE:/ { v=$0; sub(/^[^:]*:[[:space:]]*/, \"\", v); inuse=v; next } " +
             "/^SSID:/ { v=$0; sub(/^[^:]*:[[:space:]]*/, \"\", v); ssid=v; next } " +
@@ -716,10 +715,21 @@ Item {
             clip: true
             model: wifiModel
             spacing: 2
+            interactive: true
             boundsBehavior: Flickable.DragAndOvershootBounds
             boundsMovement: Flickable.FollowBoundsBehavior
             flickDeceleration: 3000
             maximumFlickVelocity: 4300
+
+            ScrollBar.vertical: ScrollBar {
+                width: 5
+                policy: ScrollBar.AsNeeded
+                contentItem: Rectangle {
+                    implicitWidth: 3
+                    radius: 1.5
+                    color: "#48484a"
+                }
+            }
 
             rebound: Transition {
                 NumberAnimation {
@@ -955,10 +965,21 @@ Item {
             clip: true
             model: bluetoothModel
             spacing: 2
+            interactive: true
             boundsBehavior: Flickable.DragAndOvershootBounds
             boundsMovement: Flickable.FollowBoundsBehavior
             flickDeceleration: 3000
             maximumFlickVelocity: 4300
+
+            ScrollBar.vertical: ScrollBar {
+                width: 5
+                policy: ScrollBar.AsNeeded
+                contentItem: Rectangle {
+                    implicitWidth: 3
+                    radius: 1.5
+                    color: "#48484a"
+                }
+            }
 
             rebound: Transition {
                 NumberAnimation {
@@ -1059,10 +1080,10 @@ Item {
     }
 
     Timer {
-        interval: root.panelType === "bluetooth" ? 1500 : 2500
+        interval: root.panelType === "bluetooth" ? 3000 : 5000
         repeat: true
         running: root.active
-        onTriggered: root.refreshCurrent(false)
+        onTriggered: root.refreshCurrent(true)
     }
 
     Process {
