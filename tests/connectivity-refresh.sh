@@ -17,5 +17,11 @@ fi
 if grep -q 'bluetoothModel.clear()' "$file"; then
     fail 'Bluetooth list is still destructively rebuilt'
 fi
+if grep -q '^[[:space:]]*add: Transition' "$file"; then
+    fail 'Connectivity rows still replay add animations during discovery'
+fi
+if grep -q '^[[:space:]]*displaced: Transition' "$file"; then
+    fail 'Connectivity rows still animate displacement during refresh'
+fi
 
 printf 'connectivity refresh contract: ok\n'
