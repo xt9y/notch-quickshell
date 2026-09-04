@@ -24,4 +24,13 @@ if grep -q '^[[:space:]]*displaced: Transition' "$file"; then
     fail 'Connectivity rows still animate displacement during refresh'
 fi
 
+grep -q '^import QtQuick.Controls' "$file" || fail 'Qt Quick Controls import for scrollbars missing'
+scrollbars=$(grep -c 'ScrollBar.vertical: ScrollBar' "$file" || true)
+(( scrollbars >= 2 )) || fail 'Wi-Fi and Bluetooth both need vertical scrollbars'
+interactive=$(grep -c '^[[:space:]]*interactive: true' "$file" || true)
+(( interactive >= 2 )) || fail 'Wi-Fi and Bluetooth lists must be explicitly interactive'
+
+grep -Fq 'var scanMode = rescan ? "yes" : "no"' "$file" || fail 'Wi-Fi rescan mode is not tied to refresh requests'
+grep -Fq 'onTriggered: root.refreshCurrent(true)' "$file" || fail 'Periodic connectivity discovery is not requesting a real scan'
+
 printf 'connectivity refresh contract: ok\n'
