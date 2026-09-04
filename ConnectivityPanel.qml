@@ -14,6 +14,17 @@ Item {
     property bool wifiScanEnabled: wifiEnabled
     property string wifiPasswordSsid: ""
 
+    // Never mutate a list while the user is interacting with it. A probe may
+    // already be running when editing starts, so consume*() also checks these.
+    property bool wifiRefreshLocked: wifiPasswordSsid !== "" ||
+        wifiAction.running || wifiForget.running || wifiRadioAction.running || radioAction.running
+    property bool bluetoothRefreshLocked: bluetoothAction.running ||
+        bluetoothForget.running || bluetoothRadioAction.running || radioAction.running
+    property bool wifiRefreshPending: false
+    property bool wifiRescanPending: false
+    property bool bluetoothRefreshPending: false
+    property bool bluetoothScanPending: false
+
     signal backRequested()
     signal statusRefreshRequested()
 
@@ -137,6 +148,34 @@ Item {
             "/^SECURITY:/ { v=$0; sub(/^[^:]*:[[:space:]]*/, \"\", v); security=v; if (ssid != \"\") print \"N\", inuse, ssid, signal, security; inuse=\"\"; ssid=\"\"; signal=0; security=\"\" }'"
     }
 
+    function queueWifiRefresh(rescan) {
+        wifiRefreshPending = true
+        wifiRescanPending = wifiRescanPending || !!rescan
+    }
+
+    function queueBluetoothRefresh(scan) {
+        bluetoothRefreshPending = true
+        bluetoothScanPending = bluetoothScanPending || !!scan
+    }
+
+    function flushWifiRefresh() {
+        if (wifiRefreshLocked || !wifiRefreshPending || !active || panelType !== "wifi")
+            return
+        var rescan = wifiRescanPending
+        wifiRefreshPending = false
+        wifiRescanPending = false
+        Qt.callLater(function() { root.refreshWifi(rescan) })
+    }
+
+    function flushBluetoothRefresh() {
+        if (bluetoothRefreshLocked || !bluetoothRefreshPending || !active || panelType !== "bluetooth")
+            return
+        var scan = bluetoothScanPending
+        bluetoothRefreshPending = false
+        bluetoothScanPending = false
+        Qt.callLater(function() { root.refreshBluetooth(scan) })
+    }
+
     function refreshAirplane() {
         if (!airplaneProbe.running)
             airplaneProbe.running = true
@@ -144,8 +183,12 @@ Item {
 
     function refreshWifi(rescan) {
         refreshAirplane()
-        if (!active || panelType !== "wifi" || wifiListProbe.running)
+        if (!active || panelType !== "wifi")
             return
+        if (wifiRefreshLocked || wifiListProbe.running) {
+            queueWifiRefresh(rescan)
+            return
+        }
         wifiListProbe.command = ["bash", "-lc", wifiScript(rescan)]
         wifiListProbe.running = true
     }
@@ -154,10 +197,17 @@ Item {
         refreshAirplane()
         if (!active || panelType !== "bluetooth")
             return
+        if (bluetoothRefreshLocked) {
+            queueBluetoothRefresh(scan)
+            return
+        }
         if (scan && !bluetoothScan.running)
             bluetoothScan.running = true
-        if (!bluetoothListProbe.running)
-            bluetoothListProbe.running = true
+        if (bluetoothListProbe.running) {
+            queueBluetoothRefresh(false)
+            return
+        }
+        bluetoothListProbe.running = true
     }
 
     function refreshCurrent(rescan) {
@@ -173,7 +223,80 @@ Item {
         airplaneMode = airplaneAvailable && lines.length > 1 && lines[1] === "blocked"
     }
 
+    function wifiIndexOf(ssid) {
+        for (var i = 0; i < wifiModel.count; ++i) {
+            if (wifiModel.get(i).ssid === ssid)
+                return i
+        }
+        return -1
+    }
+
+    function bluetoothIndexOf(address) {
+        for (var i = 0; i < bluetoothModel.count; ++i) {
+            if (bluetoothModel.get(i).address === address)
+                return i
+        }
+        return -1
+    }
+
+    // Keep existing delegates alive. We intentionally do not reorder existing
+    // rows on background signal-strength changes; this preserves focus, pointer
+    // targets and scroll position. New entries are appended and stale ones removed.
+    function reconcileWifiModel(result) {
+        var seen = ({})
+
+        for (var i = 0; i < result.length; ++i) {
+            var row = result[i]
+            seen[row.ssid] = true
+            var index = wifiIndexOf(row.ssid)
+            if (index < 0) {
+                wifiModel.append(row)
+                continue
+            }
+
+            wifiModel.setProperty(index, "active", row.active)
+            wifiModel.setProperty(index, "strength", row.strength)
+            wifiModel.setProperty(index, "security", row.security)
+            wifiModel.setProperty(index, "known", row.known)
+            wifiModel.setProperty(index, "uuid", row.uuid)
+        }
+
+        for (var j = wifiModel.count - 1; j >= 0; --j) {
+            if (!seen[wifiModel.get(j).ssid])
+                wifiModel.remove(j)
+        }
+    }
+
+    function reconcileBluetoothModel(result) {
+        var seen = ({})
+
+        for (var i = 0; i < result.length; ++i) {
+            var row = result[i]
+            seen[row.address] = true
+            var index = bluetoothIndexOf(row.address)
+            if (index < 0) {
+                bluetoothModel.append(row)
+                continue
+            }
+
+            bluetoothModel.setProperty(index, "paired", row.paired)
+            bluetoothModel.setProperty(index, "connected", row.connected)
+            bluetoothModel.setProperty(index, "trusted", row.trusted)
+            bluetoothModel.setProperty(index, "deviceName", row.deviceName)
+        }
+
+        for (var j = bluetoothModel.count - 1; j >= 0; --j) {
+            if (!seen[bluetoothModel.get(j).address])
+                bluetoothModel.remove(j)
+        }
+    }
+
     function consumeWifiList(raw) {
+        if (wifiRefreshLocked) {
+            queueWifiRefresh(false)
+            return
+        }
+
         var known = ({})
         var found = ({})
         var activeSsid = ""
@@ -242,12 +365,15 @@ Item {
             return a.ssid.localeCompare(b.ssid)
         })
 
-        wifiModel.clear()
-        for (var j = 0; j < result.length; ++j)
-            wifiModel.append(result[j])
+        reconcileWifiModel(result)
     }
 
     function consumeBluetoothList(raw) {
+        if (bluetoothRefreshLocked) {
+            queueBluetoothRefresh(false)
+            return
+        }
+
         var result = []
         var lines = raw.split("\n")
 
@@ -280,9 +406,7 @@ Item {
             return a.deviceName.localeCompare(b.deviceName)
         })
 
-        bluetoothModel.clear()
-        for (var j = 0; j < result.length; ++j)
-            bluetoothModel.append(result[j])
+        reconcileBluetoothModel(result)
     }
 
     function runWifi(command, environment) {
@@ -314,6 +438,13 @@ Item {
             ["bash", "-lc", "nmcli --wait 20 device wifi connect \"$NM_SSID\""],
             ({ NM_SSID: ssid })
         )
+    }
+
+    function cancelWifiPassword() {
+        if (wifiPasswordSsid === "")
+            return
+        wifiPasswordSsid = ""
+        flushWifiRefresh()
     }
 
     function submitWifiPassword(ssid, password) {
@@ -372,6 +503,7 @@ Item {
         if (!airplaneAvailable || radioAction.running)
             return
 
+        wifiPasswordSsid = ""
         radioAction.command = [
             "bash",
             "-lc",
@@ -383,6 +515,7 @@ Item {
     }
 
     function toggleCurrentRadio() {
+        wifiPasswordSsid = ""
         if (panelType === "wifi") {
             wifiRadioAction.command = wifiScanEnabled
                 ? ["nmcli", "radio", "wifi", "off"]
@@ -401,15 +534,30 @@ Item {
             wifiScanEnabled = wifiEnabled
     }
 
+    onWifiRefreshLockedChanged: if (!wifiRefreshLocked)
+        flushWifiRefresh()
+
+    onBluetoothRefreshLockedChanged: if (!bluetoothRefreshLocked)
+        flushBluetoothRefresh()
+
     onActiveChanged: {
-        if (active)
+        if (active) {
             Qt.callLater(function() { root.refreshCurrent(true) })
-        else
+        } else {
             wifiPasswordSsid = ""
+            wifiRefreshPending = false
+            wifiRescanPending = false
+            bluetoothRefreshPending = false
+            bluetoothScanPending = false
+        }
     }
 
     onPanelTypeChanged: {
         wifiPasswordSsid = ""
+        wifiRefreshPending = false
+        wifiRescanPending = false
+        bluetoothRefreshPending = false
+        bluetoothScanPending = false
         if (active)
             Qt.callLater(function() { root.refreshCurrent(true) })
     }
@@ -582,24 +730,6 @@ Item {
                 }
             }
 
-            add: Transition {
-                NumberAnimation {
-                    properties: "opacity,scale"
-                    from: 0
-                    to: 1
-                    duration: 170
-                    easing.type: Easing.OutBack
-                }
-            }
-
-            displaced: Transition {
-                NumberAnimation {
-                    properties: "x,y"
-                    duration: 180
-                    easing.type: Easing.OutCubic
-                }
-            }
-
             delegate: Item {
                 id: wifiRow
                 width: wifiList.width
@@ -739,6 +869,9 @@ Item {
                             root.submitWifiPassword(model.ssid, text)
                             text = ""
                         }
+                        Keys.onEscapePressed: {
+                            root.cancelWifiPassword()
+                        }
                     }
 
                     Text {
@@ -768,19 +901,24 @@ Item {
                     anchors.right: parent.right
                     anchors.rightMargin: 14
                     anchors.verticalCenter: parent.verticalCenter
-                    visible: model.known && !wifiRow.editing
+                    visible: wifiRow.editing || model.known
                     text: "x"
-                    color: forgetWifiMouse.containsMouse ? "#b8b8bd" : "#636366"
+                    color: cancelOrForgetMouse.containsMouse ? "#b8b8bd" : "#636366"
                     font.pixelSize: 15
                     font.weight: Font.DemiBold
 
                     MouseArea {
-                        id: forgetWifiMouse
+                        id: cancelOrForgetMouse
                         anchors.fill: parent
                         anchors.margins: -9
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: root.forgetWifi(model.uuid)
+                        onClicked: {
+                            if (wifiRow.editing)
+                                root.cancelWifiPassword()
+                            else
+                                root.forgetWifi(model.uuid)
+                        }
                     }
                 }
 
@@ -828,24 +966,6 @@ Item {
                     duration: 300
                     easing.type: Easing.OutBack
                     easing.overshoot: 0.2
-                }
-            }
-
-            add: Transition {
-                NumberAnimation {
-                    properties: "opacity,scale"
-                    from: 0
-                    to: 1
-                    duration: 170
-                    easing.type: Easing.OutBack
-                }
-            }
-
-            displaced: Transition {
-                NumberAnimation {
-                    properties: "x,y"
-                    duration: 180
-                    easing.type: Easing.OutCubic
                 }
             }
 
@@ -902,6 +1022,7 @@ Item {
                 MouseArea {
                     z: 1
                     anchors.fill: parent
+                    enabled: !root.bluetoothRefreshLocked
                     cursorShape: Qt.PointingHandCursor
                     onClicked: root.selectBluetooth(
                         model.address,
@@ -925,6 +1046,7 @@ Item {
                         id: forgetBtMouse
                         anchors.fill: parent
                         anchors.margins: -9
+                        enabled: !root.bluetoothRefreshLocked
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: root.forgetBluetooth(model.address)
@@ -937,7 +1059,7 @@ Item {
     }
 
     Timer {
-        interval: root.panelType === "bluetooth" ? 900 : 2000
+        interval: root.panelType === "bluetooth" ? 1500 : 2500
         repeat: true
         running: root.active
         onTriggered: root.refreshCurrent(false)
@@ -958,14 +1080,16 @@ Item {
     Process {
         id: wifiListProbe
         stdout: StdioCollector { onStreamFinished: root.consumeWifiList(text) }
+        onRunningChanged: if (!running)
+            root.flushWifiRefresh()
     }
 
     Process {
         id: wifiAction
         onRunningChanged: if (!running) {
             environment = ({})
-            root.wifiPasswordSsid = ""
-            root.refreshWifi(false)
+            root.queueWifiRefresh(false)
+            root.flushWifiRefresh()
             root.statusRefreshRequested()
         }
     }
@@ -973,7 +1097,8 @@ Item {
     Process {
         id: wifiForget
         onRunningChanged: if (!running) {
-            root.refreshWifi(true)
+            root.queueWifiRefresh(true)
+            root.flushWifiRefresh()
             root.statusRefreshRequested()
         }
     }
@@ -999,20 +1124,25 @@ Item {
             "done"
         ]
         stdout: StdioCollector { onStreamFinished: root.consumeBluetoothList(text) }
+        onRunningChanged: if (!running)
+            root.flushBluetoothRefresh()
     }
 
     Process {
         id: bluetoothScan
         command: ["bluetoothctl", "--timeout", "5", "scan", "on"]
-        onRunningChanged: if (!running)
-            root.refreshBluetooth(false)
+        onRunningChanged: if (!running) {
+            root.queueBluetoothRefresh(false)
+            root.flushBluetoothRefresh()
+        }
     }
 
     Process {
         id: bluetoothAction
         onRunningChanged: if (!running) {
             environment = ({})
-            root.refreshBluetooth(false)
+            root.queueBluetoothRefresh(false)
+            root.flushBluetoothRefresh()
             root.statusRefreshRequested()
         }
     }
@@ -1020,7 +1150,8 @@ Item {
     Process {
         id: bluetoothForget
         onRunningChanged: if (!running) {
-            root.refreshBluetooth(true)
+            root.queueBluetoothRefresh(true)
+            root.flushBluetoothRefresh()
             root.statusRefreshRequested()
         }
     }
@@ -1030,7 +1161,13 @@ Item {
         onRunningChanged: if (!running) {
             root.refreshAirplane()
             root.statusRefreshRequested()
-            root.refreshCurrent(true)
+            if (root.panelType === "wifi") {
+                root.queueWifiRefresh(true)
+                root.flushWifiRefresh()
+            } else {
+                root.queueBluetoothRefresh(true)
+                root.flushBluetoothRefresh()
+            }
         }
     }
 
@@ -1039,7 +1176,8 @@ Item {
         onRunningChanged: if (!running) {
             root.refreshAirplane()
             root.statusRefreshRequested()
-            root.refreshWifi(true)
+            root.queueWifiRefresh(true)
+            root.flushWifiRefresh()
         }
     }
 
@@ -1048,7 +1186,8 @@ Item {
         onRunningChanged: if (!running) {
             root.refreshAirplane()
             root.statusRefreshRequested()
-            root.refreshBluetooth(true)
+            root.queueBluetoothRefresh(true)
+            root.flushBluetoothRefresh()
         }
     }
 }
